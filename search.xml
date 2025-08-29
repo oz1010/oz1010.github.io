@@ -1,6 +1,55 @@
 <?xml version="1.0" encoding="utf-8"?>
 <search>
   <entry>
+    <title>V2Ray新脚本安装服务器-适合新手小白</title>
+    <url>/2025/08/28/V2Ray%E6%96%B0%E8%84%9A%E6%9C%AC%E5%AE%89%E8%A3%85%E6%9C%8D%E5%8A%A1%E5%99%A8-%E9%80%82%E5%90%88%E6%96%B0%E6%89%8B%E5%B0%8F%E7%99%BD/</url>
+    <content><![CDATA[<p><strong>先插播广告</strong></p>
+<p>使用<a
+href="https://www.vultr.com/?ref=9798034">Vultr</a>，充值就送美金，便宜还可免费换ip</p>
+<ol type="1">
+<li>最低3.5美金（2.5美金的仅支持ipv6访问），性能足够使用！</li>
+<li>可以保存快照，随时迁移新的IP地址，而且免费！</li>
+<li>可以使用支付宝和微信，相当方便！</li>
+</ol>
+<h1 id="服务器端的工作">服务器端的工作</h1>
+<h2 id="安装脚本">安装脚本</h2>
+<p>运行以下脚本即可：</p>
+<figure class="highlight sh"><table><tr><td class="code"><pre><span class="line">curl -Ls https://raw.githubusercontent.com/v2fly/fhs-install-v2ray/master/install-release.sh | <span class="built_in">sudo</span> bash</span><br></pre></td></tr></table></figure>
+<p>里面可能会有些报错信息，暂时不管，完成之后就是配置了</p>
+<h2 id="获取用户id">获取用户ID</h2>
+<p>之前的脚本，不用手动配置脚本即可使用，现在使用以上脚本，需要自己配置config.json文件，首先获取用户ID：</p>
+<p>运用指令：cat /proc/sys/kernel/random/uuid 创建一个用户 id
+，并记住这个id号；</p>
+<figure class="highlight sh"><table><tr><td class="code"><pre><span class="line">[root@vultr ~]# <span class="built_in">cat</span> /proc/sys/kernel/random/uuid </span><br><span class="line">08ef6234-dcc0-45d1-9954-f9490cb2beb2</span><br></pre></td></tr></table></figure>
+<h2 id="配置">配置</h2>
+<p>配置文件路径为/usr/local/etc/v2ray/config.json</p>
+<figure class="highlight sh"><table><tr><td class="code"><pre><span class="line">&#123;</span><br><span class="line">  <span class="string">&quot;inbounds&quot;</span>: [&#123;</span><br><span class="line">    <span class="string">&quot;port&quot;</span>: 12345,</span><br><span class="line">    <span class="string">&quot;protocol&quot;</span>: <span class="string">&quot;vmess&quot;</span>,</span><br><span class="line">    <span class="string">&quot;settings&quot;</span>: &#123;</span><br><span class="line">      <span class="string">&quot;clients&quot;</span>: [</span><br><span class="line">        &#123;</span><br><span class="line">          <span class="string">&quot;id&quot;</span>: <span class="string">&quot;08ef6234-dcc0-45d1-9954-f9490cb2beb2&quot;</span>,</span><br><span class="line">          <span class="string">&quot;level&quot;</span>: 1,</span><br><span class="line">          <span class="string">&quot;alterId&quot;</span>: 0</span><br><span class="line">        &#125;</span><br><span class="line">      ]</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;],</span><br><span class="line">  <span class="string">&quot;outbounds&quot;</span>: [&#123;</span><br><span class="line">    <span class="string">&quot;protocol&quot;</span>: <span class="string">&quot;freedom&quot;</span>,</span><br><span class="line">    <span class="string">&quot;settings&quot;</span>: &#123;&#125;</span><br><span class="line">  &#125;,&#123;</span><br><span class="line">    <span class="string">&quot;protocol&quot;</span>: <span class="string">&quot;blackhole&quot;</span>,</span><br><span class="line">    <span class="string">&quot;settings&quot;</span>: &#123;&#125;,</span><br><span class="line">    <span class="string">&quot;tag&quot;</span>: <span class="string">&quot;blocked&quot;</span></span><br><span class="line">  &#125;],</span><br><span class="line">  <span class="string">&quot;routing&quot;</span>: &#123;</span><br><span class="line">    <span class="string">&quot;rules&quot;</span>: [</span><br><span class="line">      &#123;</span><br><span class="line">        <span class="string">&quot;type&quot;</span>: <span class="string">&quot;field&quot;</span>,</span><br><span class="line">        <span class="string">&quot;ip&quot;</span>: [<span class="string">&quot;geoip:private&quot;</span>],</span><br><span class="line">        <span class="string">&quot;outboundTag&quot;</span>: <span class="string">&quot;blocked&quot;</span></span><br><span class="line">      &#125;</span><br><span class="line">    ]</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><span
+style="color:red; font-weight:bold">直接复制我上面的配置即可使用，id就是上面第二步获取的用户id</span></p>
+<h2 id="启动v2ray">启动V2Ray</h2>
+<p>在首次安装完成之后，V2Ray不会自动启动，需要手动运行上述启动命令。而在已经运行V2Ray的VPS上再次执行安装脚本，安装脚本会自动停止V2Ray
+进程，升级V2Ray程序，然后自动运行V2Ray。在升级过程中，配置文件不会被修改。</p>
+<figure class="highlight sh"><table><tr><td class="code"><pre><span class="line"><span class="comment"># 启动</span></span><br><span class="line">systemctl start v2ray</span><br><span class="line"><span class="comment"># 停止</span></span><br><span class="line">systemctl stop v2ray</span><br><span class="line"><span class="comment"># 重启</span></span><br><span class="line">systemctl restart v2ray</span><br><span class="line"><span class="comment"># 使能</span></span><br><span class="line">systemctl <span class="built_in">enable</span> v2ray</span><br></pre></td></tr></table></figure>
+<p>关于软件更新：更新 V2Ray
+的方法是再次执行安装脚本！再次执行安装脚本！再次执行安装脚本！</p>
+<h2 id="打开防火墙">打开防火墙</h2>
+<p>centos系统防火墙默认是开启的，上面第三步你用了一个端口，因此你需要打开这个端口，指令如下</p>
+<figure class="highlight sh"><table><tr><td class="code"><pre><span class="line"><span class="comment"># 添加开放端口</span></span><br><span class="line">firewall-cmd --zone=public --add-port=12345/tcp --permanent</span><br><span class="line"><span class="comment"># 重载防火墙配置，不然查看开放端口都查不到，也不能用，重载配置后即可</span></span><br><span class="line">firewall-cmd --reload</span><br><span class="line"><span class="comment"># 删除端口</span></span><br><span class="line">firewall-cmd --zone=public --remove-port=123456/tcp --permanent</span><br><span class="line"><span class="comment"># 查看已开放端口</span></span><br><span class="line">firewall-cmd --zone=public --list-ports</span><br><span class="line"><span class="comment"># 查看防火墙firewalld状态</span></span><br><span class="line">systemctl status firewalld</span><br><span class="line"><span class="comment"># 开启防火墙</span></span><br><span class="line">systemctl start firewalld</span><br><span class="line"><span class="comment"># 关闭防火墙</span></span><br><span class="line">systemctl stop firewalld</span><br></pre></td></tr></table></figure>
+<p>如果哪一天发现怎么无法使用了，有可能是IP被屏蔽，也有肯能是端口被封，这个时候就需要换个端口，别忘记防火墙开启新端口，那旧端口就可以删除了</p>
+<h1 id="客户端下载和使用">客户端下载和使用</h1>
+<h2 id="windows客户端下载">Windows客户端下载</h2>
+<h3 id="工具下载">工具下载</h3>
+<p><a
+href="https://github.com/v2ray/v2ray-core/releases">v2ray-core发布地址</a></p>
+<p><a
+href="https://github.com/2dust/v2rayN/releases">v2rayN发布地址</a></p>
+<h2 id="android客户端下载">Android客户端下载</h2>
+<h3 id="工具下载-1">工具下载</h3>
+<p><a
+href="https://github.com/2dust/v2rayNG/releases">v2rayNG发布地址</a></p>
+]]></content>
+  </entry>
+  <entry>
     <title>VStream项目设计</title>
     <url>/2025/08/23/VStream%E9%A1%B9%E7%9B%AE%E8%AE%BE%E8%AE%A1/</url>
     <content><![CDATA[<p>参考视频<a
@@ -2165,6 +2214,43 @@ Protocol）。</p>
       </categories>
   </entry>
   <entry>
+    <title>分布式基础理论</title>
+    <url>/2024/06/08/%E5%88%86%E5%B8%83%E5%BC%8F%E5%9F%BA%E7%A1%80%E7%90%86%E8%AE%BA/</url>
+    <content><![CDATA[<h1 id="分布式基础理论">分布式基础理论</h1>
+<h2 id="cap理论基本概念">CAP理论基本概念</h2>
+<ul>
+<li>数据一致性（consistency）：若系统更新操作成功，则它之后的读请求都必须读到这个新数据；若失败，则所有读请求都不能读到这个新数据，对调用者而言数据具有强一致性（strong
+consistency）</li>
+<li>服务可用性（availability）：所有请求在一定时间内得到响应，可终止，不会一直等待</li>
+<li>分区容错性（partition-tolerance）：在网络分区的情况下，被分隔的节点仍能正常对外服务</li>
+</ul>
+<h2 id="cap三者不空兼得">CAP三者不空兼得</h2>
+<p>若放弃P，即系统称为传统的单服务器模式；而分布式必然不能放弃P；</p>
+<p>实现P就允许网络存在异常。若实现CP，向一个分区的更新操作因一致性要求，必然导致网络恢复前，其他分区不能满足可用性。若实现AP，存在不同分区因网络异常，无法保证强一致性。</p>
+<p>因此，分布式系统理论上不可能选择CA架构，只能选择CP或AP架构。</p>
+<h2 id="base理论">Base理论</h2>
+<p>CAP理论的一种妥协，由于CAP只能二取一，Base理论降低了发生分区容错时对可用性和一致性的要求。</p>
+<ol type="1">
+<li>基本可用：允许可用性降低（可能响应延长、可能服务降级）</li>
+<li>软状态：指允许系统中的数据存在中间状态，并任务该中间状态不会影响系统整体可用性（比如支付完成前的支付中）</li>
+<li>最终一致性：节点数据同步可能存在时延，但在一定的期限后必须达成数据的一致，状态变为最终状态</li>
+</ol>
+<h2 id="数据一致性模型">数据一致性模型</h2>
+<p>强一致性：当更新操作完成后，任何多个后续进程的访问都会返回更新后的数据。根据CAP理论，这种实现需要牺牲可用性。</p>
+<p>弱一致性：当更新操作完成后，不承诺立即可以读到更新后的数据，而这段时间存在“不一致性窗口”。</p>
+<p>最终一致性：是弱一致性的特例，强调的是所有的数据副本，在经过一定时间的同步后，最终能够达到一个一致的状态。达到最终一致性的时间，就是不一致窗口时间。在没有故障发生的前提下，不一致窗口的时间主要受通信延迟，系统负载和复制副本的个数影响。</p>
+<p>最终一致性模型根据其提供的不同保证可以划分为因果一致性和会话一致性等等模型。</p>
+<p>因果一致性：要求有因果关系的操作顺序要得到保证，非因果关系的操作顺序则无所谓。</p>
+<p>会话一致性：将对系统数据的访问过程框定在了一个会话当中，约定了系统保证在同一个有效的会话中实现“读己之所写”的一致性。</p>
+<h2 id="quorumwaro机制">Quorum、WARO机制</h2>
+<p>WARO：一种简单的副本控制协议，写操作时，只有当所有副本都成功更新之后，这次写操作才算成功，否则视为失败。优先保证读、任何节点读到的数据都是最新数据，牺牲了更新服务的可用性。但只要有一个节点存活，任然能够提供读服务。</p>
+<p>选举算法Quorum机制：如，10个副本，一次成功更新了三个，那么需要读取八个副本的数据，可以保证读到最新数据。无法保证强一致性，也就是无法实现任何时刻或节点都可以读到最近一次成功提交的副本数据。需要配合一个获取最新成功提交的版本号的metadata服务，这样可以确定最新成功提交的版本号，然后从已经读到的数据中就可以确认最新写入的数据。</p>
+]]></content>
+      <categories>
+        <category>分布式</category>
+      </categories>
+  </entry>
+  <entry>
     <title>嵌入式Linux驱动开发笔记</title>
     <url>/2024/04/24/%E5%B5%8C%E5%85%A5%E5%BC%8FLinux%E9%A9%B1%E5%8A%A8%E5%BC%80%E5%8F%91%E7%AC%94%E8%AE%B0/</url>
     <content><![CDATA[<h1 id="模拟vexpress-a9">模拟vexpress-a9</h1>
@@ -4273,6 +4359,134 @@ id="osfreertosportable的cmakelists">os/freertos/portable的CMakeLists</h3>
       </categories>
   </entry>
   <entry>
+    <title>NES红白机学习笔记</title>
+    <url>/2024/03/22/NES%E7%BA%A2%E7%99%BD%E6%9C%BA%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0/</url>
+    <content><![CDATA[<h1 id="计划">计划</h1>
+<ol type="1">
+<li>模拟6502、总线和内存RAM，CPU能够从内存读写数据和获取指令</li>
+<li>参考CPU的数据手册，能够对指令进行解析</li>
+<li>解析卡带Cartidge的文件格式</li>
+<li>实现Mapper功能</li>
+<li>构建PPU模块，能够调用SFML输出画面</li>
+<li>增加按键控制功能</li>
+</ol>
+<h1 id="cpu-6502">CPU-6502</h1>
+<h2 id="a03简介">2A03简介</h2>
+<p>2A03是Ricoh（理光集团）基于6502制造的NMOS处理器。</p>
+<p>小端字节处理器。</p>
+<h2 id="cpu内存分布">CPU内存分布</h2>
+<p>下图展示处理器如何使用总线访问内存。内存分为三个区域：卡带中的ROM、处理器RAM、I/O寄存器。8位控制总线负责通知组件请求是读还是写。8位数据总线用于读写字节。16位地址总线用于选择目标组件。请注意，ROM是只读的，需要通过MMC访问，以便切换bank。I/O寄存器用于和系统其他组件通信，比如PPU和控制器。</p>
+<figure>
+<img
+src="https://p0.oz1010.site:39890/images/2023/09/17/image-20230917160740959.png"
+alt="image-20230917160740959" />
+<figcaption aria-hidden="true">image-20230917160740959</figcaption>
+</figure>
+<p>16位地址总线可以访问64KB内存地址<code>$0000-$FFFF</code>。具体的分布见下图。RAM区域<code>$0000-$2000</code>，I/O寄存器区域<code>$2000-$4020</code>，扩展ROM区域<code>$4020-$6000</code>，SRAM区域<code>$6000-$8000</code>，程序ROM区域<code>$8000-$10000</code>。</p>
+<p>零页是指地址范围<code>$0000-$00FF</code>，在特定模式下允许更快的执行。内存地址<code>$0000-$00FF</code>会被镜像三次到<code>$0800-$2000</code>。比如，任何写到<code>$0000</code>的数据也会写到<code>$0800</code>、<code>$1000</code>和<code>$1800</code>。</p>
+<p>位置<code>$2000-$2007</code>每8字节会被镜像到<code>$2008-$3FFF</code>，剩余的寄存器都遵循这个镜像。</p>
+<p>SRAM(WRAM)是存储内存，这个地址用于访问记忆游戏Cartridges卡带中的RAM。</p>
+<p>从<code>$8000</code>开始的地址是分配给Cartridges卡带的PRG-ROM。游戏只有一个16KB数据区（bank）的，会被加载到<code>$8000</code>和<code>$C000</code>。游戏有两个16KB数据区的，将一个加载到<code>$8000</code>，另一个加载到<code>$C000</code>。游戏拥有超过两个16KB数据区的，使用内存映射器决定哪个数据区加载到内存。内存映射器会监视特定地址(或地址范围)的内存写入，当地址被写入时，它会执行数据区切换。详见附录D。</p>
+<figure>
+<img
+src="https://p0.oz1010.site:39890/images/2023/09/17/image-20230917165157967.png"
+alt="image-20230917165157967" />
+<figcaption aria-hidden="true">image-20230917165157967</figcaption>
+</figure>
+<h2 id="寄存器">寄存器</h2>
+<p><strong>Program Counter (PC)</strong></p>
+<p>16位寄存器；</p>
+<p><strong>Stack Pointer (SP)</strong></p>
+<p>8位寄存器；固定偏移<code>$0100</code>；位置<code>$0100-$01FF</code>；自顶向下增长；不会检测越界；</p>
+<p><strong>Accumulator (A)</strong></p>
+<p>8位寄存器；从内存取值；</p>
+<p><strong>Index Register X (X)</strong></p>
+<p>8位寄存器；从内存取值；地址偏移值；读写SP寄存器；</p>
+<p><strong>Index Register Y (Y)</strong></p>
+<p>8位寄存器；从内存取值；地址偏移值；</p>
+<p><strong>Processor Status (P)</strong></p>
+<figure>
+<img
+src="https://p0.oz1010.site:39890/images/2023/09/17/image-20230917211324567.png"
+alt="image-20230917211324567" />
+<figcaption aria-hidden="true">image-20230917211324567</figcaption>
+</figure>
+<ul>
+<li>Carry Flag (C) 上个指令结果越界标记；指令SEC/CLC，设置为1/0；</li>
+<li>Zero Flag (Z) 上个指令结果为零标记；</li>
+<li>Interrupt Disable (I) 中断禁用标记；指令SEI/CLI，设置为1/0；</li>
+<li>Decimal Mode (D)
+BCD十进制模式，会被忽略；指令SED/CLD，设置为1/0；</li>
+<li>Break Command (B) 指明BRK指令，会引发IRQ；</li>
+<li>Overflow Flag (V) 溢出标记；</li>
+<li>Negative Flag (N) 符号位；0为正，1为负；</li>
+</ul>
+<h2 id="中断">中断</h2>
+<p>NES有三种类型的中断：NMI、IRQ、复位，中断向量表存储在<code>$FFFA-$FFFF</code>；</p>
+<p>发生中断时，需要进行如下步骤：</p>
+<ol type="1">
+<li>识别中断；</li>
+<li>完成当前指令执行；</li>
+<li>PC和P寄存器压栈；</li>
+<li>设置中断禁用位；</li>
+<li>读取中断向量表处理函数赋值给PC；</li>
+<li>执行处理函数；</li>
+<li>执行RTI指令，恢复P和PC寄存器；</li>
+<li>继续执行程序；</li>
+</ol>
+<p>中断或可屏蔽中断，是由某些内存映射器生成的。</p>
+<p>IRQ可以由软件使用BRK指令触发。当发生IRQ时，系统跳到<code>$FFFE</code>和<code>$FFFF</code>所指地址。</p>
+<p>NMI(不可屏蔽中断)是当V-Blank出现在每个帧的末尾时，PPU产生的中断类型。它不受中断禁用寄存器影响，所以它发生时，程序总是被中断。当PPU控制寄存器1（<code>$2000</code>）被清空时，会阻止NMI的触发。当发生NMI时，系统跳到<code>$FFFA</code>和<code>$FFFB</code>所指地址。</p>
+<p>复位中断在系统第一次启动和用户按下复位按钮时触发。当发生复位时，系统跳到<code>$FFFC</code>和<code>$FFFD</code>所指地址。</p>
+<p>中断优先级为复位、NMI和IRQ。NES有7个周期的中断延时，即它会花费7个CPU周期来开始执行中断处理。</p>
+<h2 id="寻址模式">寻址模式</h2>
+<p>在6502上总共有13种不同的寻址模式。详见附录E。</p>
+<h2 id="指令">指令</h2>
+<p>6502有56条不同的指令，尽管有些指令有多种，使用不同的寻址模式，使得在可能得256个操作码中总计151个有效。指令可以是1、2或3字节长，根据它们的寻址模式。第一个字节为操作码，其他字节为操作数。指令可以分为几个功能组：</p>
+<ul>
+<li>加载/存储操作</li>
+<li>寄存器传输操作</li>
+<li>栈操作</li>
+<li>逻辑操作</li>
+<li>算术操作</li>
+<li>递增/递减</li>
+<li>移位</li>
+<li>跳转/调用</li>
+<li>分支</li>
+<li>状态寄存器操作</li>
+<li>系统函数</li>
+</ul>
+<h1 id="ppu-2c02">PPU-2C02</h1>
+<h2 id="内存分布">内存分布</h2>
+<figure>
+<img
+src="https://p0.oz1010.site:39890/images/2023/09/23/image-20230923162104444.png"
+alt="image-20230923162104444" />
+<figcaption aria-hidden="true">image-20230923162104444</figcaption>
+</figure>
+<h2 id="图案表">图案表</h2>
+<p>英文名PatternTable，卡带CHR-ROM映射到此处，也可能是RAM。游戏中使用的一个图案被称为Tile，背景或精灵都是由若干个Tile组成。</p>
+<figure>
+<img
+src="https://p0.oz1010.site:39890/images/2023/09/24/image-20230924191909278.png"
+alt="image-20230924191909278" />
+<figcaption aria-hidden="true">image-20230924191909278</figcaption>
+</figure>
+<p>每个Tile大小为8x8像素，游戏屏幕大小为256x240像素，由32x30个Tile组成。</p>
+<p>一个图案表占用大小4KB，总共有两个占用8KB。对于许多游戏拥有超过两个图案表，需要使用Mapper来控制映射。</p>
+<p>简单计算：</p>
+<p>一个PatternTable大小4KB，由256个Tile组成。每个Tile大小为4KB/256=16B。一个Tile大小8x8=64像素，每个像素占用16B/64=2bit。</p>
+<h1 id="参考">参考</h1>
+<p>《Nintendo Entertainment System Documentation Version 1.0.pdf》</p>
+<p>《任天堂产品系统文件.chm》</p>
+<p><a
+href="https://zhuanlan.zhihu.com/p/406252623">“玩”明白计算机底层系列-计组-红白机模拟器
+- 知乎 (zhihu.com)</a></p>
+<p><a
+href="https://blog.csdn.net/qq_34254642/category_9730176.html">NES专题_金小庭的博客-CSDN博客</a></p>
+]]></content>
+  </entry>
+  <entry>
     <title>CentOS7-国内环境Kubernetes安装说明</title>
     <url>/2024/02/26/CentOS7-%E5%9B%BD%E5%86%85%E7%8E%AF%E5%A2%83Kubernetes%E5%AE%89%E8%A3%85%E8%AF%B4%E6%98%8E/</url>
     <content><![CDATA[<h1 id="docker容器安装">Docker容器安装</h1>
@@ -4602,6 +4816,69 @@ href="https://blog.csdn.net/qq_34533957/article/details/111409196">文章</a></p
       </categories>
   </entry>
   <entry>
+    <title>Xv6-RISC-V学习笔记</title>
+    <url>/2024/01/07/Xv6-RISC-V%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0/</url>
+    <content><![CDATA[<h1 id="简介">简介</h1>
+<p><a href="https://github.com/mit-pdos/xv6-public.git">xv6-public
+GitHub</a></p>
+<p><a href="https://gitee.com/mic/xv6-riscv.git">xv6-riscv Gitee</a></p>
+<p><a href="http://pdos.csail.mit.edu/6.828/">麻省理工6.828课程</a></p>
+<p><a
+href="http://pdos.csail.mit.edu/6.828/2012/xv6/book-rev7.pdf">英文文档</a></p>
+<p><a
+href="https://th0ar.gitbooks.io/xv6-chinese/content/index.html">中文文档</a></p>
+<p>xv6 是 MIT 开发的一个教学用的完整的类 Unix 操作系统，并且在 MIT
+的操作系统课程 <a
+href="http://pdos.csail.mit.edu/6.828/2012/xv6.html">6.828</a>
+中使用。通过阅读并理解 xv6
+的代码，可以清楚地了解操作系统中众多核心的概念，对操作系统感兴趣的同学十分推荐一读！这份文档是中文翻译的
+MIT xv6 文档，是阅读代码过程中非常好的参考资料。</p>
+<p><a
+href="%5Bxv6%20源码调试环境搭建_sudo%20apt%20install%20qemu-system-riscv64-CSDN博客%5D(https://blog.csdn.net/OnlyLove_/article/details/128428047)">qemu调试xv6环境</a></p>
+<h2 id="环境搭建">环境搭建</h2>
+<p>下载xv6源码（riscv版本）</p>
+<p>安装编译环境</p>
+<figure class="highlight sh"><table><tr><td class="code"><pre><span class="line"><span class="built_in">sudo</span> apt-get install -y qemu-system-misc binutils-riscv64-linux-gnu gcc-riscv64-linux-gnu gdb-multiarch</span><br></pre></td></tr></table></figure>
+<p>直接<code>make</code>编译，<code>make qemu</code>启动环境。</p>
+<p>若使用VSCode进行调试，参考附录进行配置。</p>
+<h2 id="qemu-virt简介">QEMU virt简介</h2>
+<p><a href="">QEMU riscv 启动代码</a></p>
+<p>QEMU
+virt有8个hart，通过汇编指令<code>csrr a1, mhartid</code>可以读取hart对应的值。所有的hart都会执行执行内核代码。</p>
+<p>Bootloader在启动后，会将内核放置在<code>0x80000000</code>处</p>
+<h1 id="附录">附录</h1>
+<h2 id="vscode一键调试">VSCode一键调试</h2>
+<p><code>xv6-riscv</code>目录中放置<code>xv6</code>源码</p>
+<ul>
+<li>已知问题，启动过程中QEMU直接退出，需要修改GDB配置文件<code>.gdbinit</code></li>
+</ul>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">set confirm off</span><br><span class="line">set architecture riscv:rv64</span><br><span class="line">@REM target remote 127.0.0.1:26000</span><br><span class="line">symbol-file kernel/kernel</span><br><span class="line">set disassemble-next-line auto</span><br><span class="line">set riscv use-compressed-breakpoints yes</span><br></pre></td></tr></table></figure>
+<ul>
+<li><code>tasks.json</code>内容</li>
+</ul>
+<figure class="highlight json"><table><tr><td class="code"><pre><span class="line"><span class="punctuation">&#123;</span></span><br><span class="line">    <span class="comment">// See https://go.microsoft.com/fwlink/?LinkId=733558</span></span><br><span class="line">    <span class="comment">// for the documentation about the tasks.json format</span></span><br><span class="line">    <span class="attr">&quot;version&quot;</span><span class="punctuation">:</span> <span class="string">&quot;2.0.0&quot;</span><span class="punctuation">,</span></span><br><span class="line">    <span class="attr">&quot;options&quot;</span><span class="punctuation">:</span> <span class="punctuation">&#123;</span></span><br><span class="line">        <span class="attr">&quot;cwd&quot;</span><span class="punctuation">:</span> <span class="string">&quot;$&#123;workspaceFolder&#125;/xv6-riscv&quot;</span></span><br><span class="line">    <span class="punctuation">&#125;</span><span class="punctuation">,</span></span><br><span class="line">    <span class="attr">&quot;tasks&quot;</span><span class="punctuation">:</span> <span class="punctuation">[</span></span><br><span class="line">        <span class="punctuation">&#123;</span></span><br><span class="line">            <span class="attr">&quot;label&quot;</span><span class="punctuation">:</span> <span class="string">&quot;xv6-qemu-task&quot;</span><span class="punctuation">,</span></span><br><span class="line">            <span class="attr">&quot;type&quot;</span><span class="punctuation">:</span> <span class="string">&quot;shell&quot;</span><span class="punctuation">,</span></span><br><span class="line">            <span class="comment">// &quot;command&quot;: &quot;echo all done&quot;,</span></span><br><span class="line">            <span class="attr">&quot;isBackground&quot;</span><span class="punctuation">:</span> <span class="literal"><span class="keyword">true</span></span><span class="punctuation">,</span></span><br><span class="line">            <span class="attr">&quot;command&quot;</span><span class="punctuation">:</span> <span class="string">&quot;make &amp;&amp; make qemu-gdb&quot;</span><span class="punctuation">,</span></span><br><span class="line">            <span class="attr">&quot;problemMatcher&quot;</span><span class="punctuation">:</span> <span class="punctuation">[</span></span><br><span class="line">                <span class="punctuation">&#123;</span></span><br><span class="line">                    <span class="attr">&quot;pattern&quot;</span><span class="punctuation">:</span> <span class="punctuation">[</span></span><br><span class="line">                        <span class="punctuation">&#123;</span></span><br><span class="line">                            <span class="attr">&quot;regexp&quot;</span><span class="punctuation">:</span> <span class="string">&quot;.&quot;</span><span class="punctuation">,</span></span><br><span class="line">                            <span class="attr">&quot;file&quot;</span><span class="punctuation">:</span> <span class="number">1</span><span class="punctuation">,</span></span><br><span class="line">                            <span class="attr">&quot;location&quot;</span><span class="punctuation">:</span> <span class="number">2</span><span class="punctuation">,</span></span><br><span class="line">                            <span class="attr">&quot;message&quot;</span><span class="punctuation">:</span> <span class="number">3</span></span><br><span class="line">                        <span class="punctuation">&#125;</span></span><br><span class="line">                    <span class="punctuation">]</span><span class="punctuation">,</span></span><br><span class="line">                    <span class="attr">&quot;background&quot;</span><span class="punctuation">:</span> <span class="punctuation">&#123;</span></span><br><span class="line">                        <span class="attr">&quot;beginsPattern&quot;</span><span class="punctuation">:</span> <span class="string">&quot;.*Now run &#x27;gdb&#x27; in another window.&quot;</span><span class="punctuation">,</span></span><br><span class="line">                        <span class="attr">&quot;endsPattern&quot;</span><span class="punctuation">:</span> <span class="string">&quot;.&quot;</span></span><br><span class="line">                    <span class="punctuation">&#125;</span></span><br><span class="line">                <span class="punctuation">&#125;</span></span><br><span class="line">            <span class="punctuation">]</span><span class="punctuation">,</span></span><br><span class="line">            <span class="attr">&quot;group&quot;</span><span class="punctuation">:</span> <span class="punctuation">&#123;</span></span><br><span class="line">                <span class="attr">&quot;kind&quot;</span><span class="punctuation">:</span> <span class="string">&quot;build&quot;</span><span class="punctuation">,</span></span><br><span class="line">                <span class="attr">&quot;isDefault&quot;</span><span class="punctuation">:</span> <span class="literal"><span class="keyword">true</span></span></span><br><span class="line">            <span class="punctuation">&#125;</span></span><br><span class="line">        <span class="punctuation">&#125;</span></span><br><span class="line">    <span class="punctuation">]</span></span><br><span class="line"><span class="punctuation">&#125;</span></span><br></pre></td></tr></table></figure>
+<ul>
+<li><code>launch.json</code>内容</li>
+</ul>
+<figure class="highlight json"><table><tr><td class="code"><pre><span class="line"><span class="punctuation">&#123;</span></span><br><span class="line">    <span class="comment">// 使用 IntelliSense 了解相关属性。 </span></span><br><span class="line">    <span class="comment">// 悬停以查看现有属性的描述。</span></span><br><span class="line">    <span class="comment">// 欲了解更多信息，请访问: https://go.microsoft.com/fwlink/?linkid=830387</span></span><br><span class="line">    <span class="attr">&quot;version&quot;</span><span class="punctuation">:</span> <span class="string">&quot;0.2.0&quot;</span><span class="punctuation">,</span></span><br><span class="line">    <span class="attr">&quot;configurations&quot;</span><span class="punctuation">:</span> <span class="punctuation">[</span></span><br><span class="line">        <span class="punctuation">&#123;</span></span><br><span class="line">            <span class="attr">&quot;name&quot;</span><span class="punctuation">:</span> <span class="string">&quot;xv6-qemu-gdb&quot;</span><span class="punctuation">,</span></span><br><span class="line">            <span class="attr">&quot;type&quot;</span><span class="punctuation">:</span> <span class="string">&quot;cppdbg&quot;</span><span class="punctuation">,</span></span><br><span class="line">            <span class="attr">&quot;request&quot;</span><span class="punctuation">:</span> <span class="string">&quot;launch&quot;</span><span class="punctuation">,</span></span><br><span class="line">            <span class="attr">&quot;program&quot;</span><span class="punctuation">:</span> <span class="string">&quot;$&#123;workspaceRoot&#125;/xv6-riscv/kernel/kernel&quot;</span><span class="punctuation">,</span></span><br><span class="line">            <span class="attr">&quot;stopAtEntry&quot;</span><span class="punctuation">:</span> <span class="literal"><span class="keyword">true</span></span><span class="punctuation">,</span></span><br><span class="line">            <span class="attr">&quot;cwd&quot;</span><span class="punctuation">:</span> <span class="string">&quot;$&#123;workspaceRoot&#125;/xv6-riscv&quot;</span><span class="punctuation">,</span></span><br><span class="line">            <span class="attr">&quot;miDebuggerServerAddress&quot;</span><span class="punctuation">:</span> <span class="string">&quot;127.0.0.1:26000&quot;</span><span class="punctuation">,</span></span><br><span class="line">            <span class="attr">&quot;miDebuggerPath&quot;</span><span class="punctuation">:</span> <span class="string">&quot;/usr/bin/gdb-multiarch&quot;</span><span class="punctuation">,</span></span><br><span class="line">            <span class="attr">&quot;MIMode&quot;</span><span class="punctuation">:</span> <span class="string">&quot;gdb&quot;</span><span class="punctuation">,</span></span><br><span class="line">            <span class="attr">&quot;preLaunchTask&quot;</span><span class="punctuation">:</span> <span class="string">&quot;xv6-qemu-task&quot;</span><span class="punctuation">,</span></span><br><span class="line">        <span class="punctuation">&#125;</span></span><br><span class="line">    <span class="punctuation">]</span></span><br><span class="line"><span class="punctuation">&#125;</span></span><br></pre></td></tr></table></figure>
+]]></content>
+      <categories>
+        <category>Xv6</category>
+      </categories>
+  </entry>
+  <entry>
+    <title>CH32V307V-裸板驱动</title>
+    <url>/2024/01/06/CH32V307V-%E8%A3%B8%E6%9D%BF%E9%A9%B1%E5%8A%A8/</url>
+    <content><![CDATA[<h1 id="简介">简介</h1>
+<h1 id="i2c驱动">I2C驱动</h1>
+<p>开发板：CH32V307V-EVT-R1 RISC-V32</p>
+<p>引脚复用：</p>
+<figure class="highlight txt"><table><tr><td class="code"><pre><span class="line">参考：CH32V307DS0.PDF</span><br><span class="line">PB5 &lt;--&gt; I2C1_SMBA</span><br><span class="line">PB8 &lt;--&gt; I2C1_SCL</span><br><span class="line">PB9 &lt;--&gt; I2C1_SDA</span><br><span class="line">PB10 &lt;--&gt; I2C2_SCL</span><br><span class="line">PB11 &lt;--&gt; I2C2_SDA</span><br><span class="line">PB12 &lt;--&gt; I2C2_SMBA</span><br><span class="line"></span><br><span class="line">I2C1 &lt;--&gt; I2C2</span><br><span class="line">PB8  &lt;--&gt; PB10</span><br><span class="line">PB9  &lt;--&gt; PB11</span><br></pre></td></tr></table></figure>
+<h1 id="spi驱动">SPI驱动</h1>
+<h1 id="usb驱动">USB驱动</h1>
+]]></content>
+  </entry>
+  <entry>
     <title>编程语言-C的指针问题</title>
     <url>/2023/09/28/%E7%BC%96%E7%A8%8B%E8%AF%AD%E8%A8%80-C%E7%9A%84%E6%8C%87%E9%92%88%E9%97%AE%E9%A2%98/</url>
     <content><![CDATA[<p>为什么说指针是C语言的精髓？ 指针有什么用 举例说明</p>
@@ -4668,12 +4945,199 @@ href="https://zhuanlan.zhihu.com/p/506834783">Linux设备驱动之字符设备�
 ]]></content>
   </entry>
   <entry>
+    <title>Intel芯片手册节选</title>
+    <url>/2023/09/28/Intel%E8%8A%AF%E7%89%87%E6%89%8B%E5%86%8C%E8%8A%82%E9%80%89/</url>
+    <content><![CDATA[<h2 id="保护模式内存管理">保护模式内存管理</h2>
+<p>vol-3 Chapter 3 Protected-Mode Memory Management</p>
+<p>内存管理机制：段和页</p>
+<p>开启保护模式会使能段机制，页机制是可选的。</p>
+<p><图片>Figure 3-1. Segmentation and Paging</p>
+<p>完整内存管理机制开启后，地址转换：</p>
+<p>Logical Address -段-&gt; Linear Address -页-&gt; Physical Address</p>
+<p>详细转换流程</p>
+<p>逻辑地址组成：段选择器 （线性地址）偏移</p>
+<p>段选择器为全局描述表（GDT）的索引，就能找到段描述项，从中取出段基地址（线性地址空间），与偏移地址就能得到页描述项？</p>
+<p>页描述组成：页目录索引 页表索引 （物理地址）偏移</p>
+<p>页大小典型值为4K，当被访问的页（物理内存）不在当前内存中，则处理器会产生页错误（page-fault）异常</p>
+<p>使用段机制</p>
+<p>基本扁平模式（Basic Flat Model）</p>
+<p>ROM分配在FFFF_FFF0H内存处，RAM在DS值为0时在内存底部</p>
+<p>受保护扁平模式（Protected Flat Model）</p>
+<p>访问不存在内存时，会触发通用保护（general-protection）异常</p>
+<p>用户设置特权等级3的代码和数据段，管理员设置权限等级0的代码和数据段</p>
+<p>多段模式（Multi-Segment Model）</p>
+<p>逻辑与线性地址</p>
+<p>图 Figure 3-5. Logical Address to Linear Address Translation</p>
+<p>GDT或LDT</p>
+<p>段选择器结构</p>
+<p>图 Figure 3-6. Segment Selector</p>
+<p>Index
+（位3-位15）可选择GDT或LDT中8K中的一项（每个段描述符大小为8字节）</p>
+<p>TI （位2）表指示器，0使用GDT，1使用LDT</p>
+<p>RPL （位0-1）特权选择器，0最高权限</p>
+<p>6个段寄存器（CS DS SS ES FS
+GS），前三个必须加载有效的段选择器。每个寄存器都有可见的段选择器和不可见的基地址、限制和权限。</p>
+<p>配置方式：</p>
+<ul>
+<li>MOV, POP, LDS, LES, LSS, LGS, and
+LFS指令显示加载相应寄存器，MOV通常用作存储段寄存器可见区域</li>
+<li>CALL, JMP, and RET， SYSENTER and SYSEXIT，IRET, INT <em>n</em>,
+INTO, INT3, and INT1指令隐形加载CS寄存器（有事有其他段寄存器）</li>
+</ul>
+<p>段描述符</p>
+<p>图 Figure 3-8. Segment Descriptor</p>
+<p><strong>Segment limit field</strong>
+20位，指定段的大小。G==0，1Byte<sub>1MB，粒度1Byte；G==1，4KB</sub>4GB，粒度4KB；</p>
+<p><strong>Base address fields</strong>
+24位，定义4GB线性地址空间的起始位置，推荐地址16字节对齐；</p>
+<p><strong>Type field</strong>
+4位，指示段或门类型，并指定可以对段进行的访问类型和增长方向，功能由其他域决定；</p>
+<p><strong>S (descriptor type) flag</strong>
+1位，指定段类型，0系统段，1代码或数据段；</p>
+<p><strong>DPL (descriptor privilege level) field</strong>
+2位，指定段特权等级。0特权等级最高；</p>
+<p><strong>P (segment-present) flag</strong>
+指示段是否在内存中，1存在，0不存在；</p>
+<p><strong>D/B (default operation size/default stack pointer size and/or
+upper bound) flag</strong> 1位，不同段描述符不同功能</p>
+<p><strong>G (granularity) flag</strong>
+1位，指明段限制域缩放比例。0字节单位，1 4KB单位。</p>
+<p><strong>L (64-bit code segment) flag</strong> 1位</p>
+<p><strong>Available and reserved bits</strong>
+1位，可供系统软件使用</p>
+<h2 id="保护">保护</h2>
+<p>图 Figure 5-1. Descriptor Fields Used for Protection</p>
+<h2 id="中断和异常处理">中断和异常处理</h2>
+<p>表 Table 6-1. Protected-Mode Exceptions and Interrupts</p>
+]]></content>
+  </entry>
+  <entry>
     <title>编程语言-Haskell简介</title>
     <url>/2023/09/28/%E7%BC%96%E7%A8%8B%E8%AF%AD%E8%A8%80-Haskell%E7%AE%80%E4%BB%8B/</url>
     <content><![CDATA[<p>函数式编程</p>
 <p><a href="https://www.haskell.org/">官方主页</a></p>
 <p><a
 href="https://www.w3cschool.cn/hsriti/r6w1aozt.html">网上教程</a></p>
+]]></content>
+  </entry>
+  <entry>
+    <title>Shell脚本基础</title>
+    <url>/2023/09/28/Shell%E8%84%9A%E6%9C%AC%E5%9F%BA%E7%A1%80/</url>
+    <content><![CDATA[<h2 id="基本结构">基本结构</h2>
+<figure class="highlight sh"><table><tr><td class="code"><pre><span class="line"><span class="meta">#!/bin/sh</span></span><br></pre></td></tr></table></figure>
+<h2 id="变量">变量</h2>
+<p>脚本所有变量都为<strong>字符串</strong></p>
+<h3 id="声明变量">声明变量</h3>
+<figure class="highlight sh"><table><tr><td class="code"><pre><span class="line">nodeList=</span><br><span class="line">cmdBuild=<span class="string">&quot;build&quot;</span></span><br></pre></td></tr></table></figure>
+<h3 id="使用变量">使用变量</h3>
+<figure class="highlight sh"><table><tr><td class="code"><pre><span class="line">cmd=<span class="variable">$cmdBuild</span></span><br><span class="line">cmdFile=<span class="variable">$&#123;cmdBuild&#125;</span>_file.<span class="built_in">log</span></span><br></pre></td></tr></table></figure>
+<h3 id="截断">截断</h3>
+<figure class="highlight sh"><table><tr><td class="code"><pre><span class="line">$ list=<span class="string">&quot;app _install util _install scripts logs&quot;</span></span><br><span class="line">$ <span class="built_in">echo</span> <span class="variable">$list</span></span><br><span class="line">app _install util _install scripts logs</span><br><span class="line"></span><br><span class="line"><span class="comment"># 将标识符_install及尾部去除，只保留头部</span></span><br><span class="line">$ <span class="built_in">echo</span> <span class="variable">$&#123;list%_install*&#125;</span></span><br><span class="line">app _install util</span><br><span class="line">$ <span class="built_in">echo</span> <span class="variable">$&#123;list%%_install*scri*&#125;</span></span><br><span class="line">app</span><br><span class="line"></span><br><span class="line"><span class="comment"># 将标识符_install及头部去除，只保留尾部</span></span><br><span class="line">$ <span class="built_in">echo</span> <span class="variable">$&#123;list#*_install&#125;</span></span><br><span class="line"> util _install scripts logs</span><br><span class="line">$ <span class="built_in">echo</span> <span class="variable">$&#123;list##*_install&#125;</span></span><br><span class="line"> scripts logs</span><br></pre></td></tr></table></figure>
+<h2 id="数组">数组</h2>
+<h3 id="声明数组">声明数组</h3>
+<figure class="highlight sh"><table><tr><td class="code"><pre><span class="line">defaultNodeList=`<span class="built_in">ls</span> -d */ | awk <span class="string">&#x27;&#123;gsub(/\//,&quot;&quot;); print $0&#125;&#x27;</span>`</span><br><span class="line"></span><br><span class="line"><span class="comment"># 直接输出</span></span><br><span class="line">$ <span class="built_in">echo</span> <span class="variable">$defaultNodeList</span></span><br><span class="line">app _install util</span><br><span class="line"></span><br><span class="line"><span class="comment"># 循环输出</span></span><br><span class="line">$ <span class="keyword">for</span> node <span class="keyword">in</span> <span class="variable">$defaultNodeList</span>; <span class="keyword">do</span> <span class="built_in">echo</span> <span class="variable">$node</span>; <span class="keyword">done</span></span><br><span class="line">node: app</span><br><span class="line">node: _install</span><br><span class="line">node: util</span><br></pre></td></tr></table></figure>
+<h3 id="增加元素">增加元素</h3>
+<figure class="highlight sh"><table><tr><td class="code"><pre><span class="line"><span class="comment"># 数组尾部增加元素</span></span><br><span class="line">defaultNodeList=<span class="string">&quot;<span class="variable">$defaultNodeList</span> tailItem&quot;</span></span><br><span class="line"><span class="comment"># 数组头部增加元素</span></span><br><span class="line">defaultNodeList=<span class="string">&quot;headItem <span class="variable">$defaultNodeList</span>&quot;</span></span><br></pre></td></tr></table></figure>
+<h3 id="删除元素">删除元素</h3>
+<p>方法1，字符串截断，列表不能有重复元素</p>
+<figure class="highlight sh"><table><tr><td class="code"><pre><span class="line">delim=<span class="string">&quot;_install&quot;</span></span><br><span class="line">defaultNodeList=<span class="string">&quot;<span class="variable">$&#123;defaultNodeList%%<span class="variable">$&#123;delim&#125;</span>*&#125;</span> <span class="variable">$&#123;defaultNodeList##*<span class="variable">$&#123;delim&#125;</span>&#125;</span>&quot;</span></span><br></pre></td></tr></table></figure>
+<p>方法2，关键字替换，可以替换所有元素</p>
+<p>方法3，重新创建新数组，将指定元素丢弃</p>
+<h2 id="判断">判断</h2>
+<p>单个条件</p>
+<figure class="highlight sh"><table><tr><td class="code"><pre><span class="line"><span class="keyword">if</span> [ -z <span class="string">&quot;<span class="variable">$1</span>&quot;</span> ]; <span class="keyword">then</span></span><br><span class="line">	<span class="built_in">echo</span> <span class="string">&quot;Update cmd is empty, skip it.&quot;</span></span><br><span class="line"><span class="keyword">elif</span> [ -z <span class="string">&quot;<span class="variable">$2</span>&quot;</span> ]; <span class="keyword">then</span></span><br><span class="line">	<span class="built_in">echo</span> <span class="string">&quot;Directory(<span class="variable">$s</span>) is runtime, skip it.&quot;</span></span><br><span class="line"><span class="keyword">else</span></span><br><span class="line">	<span class="built_in">echo</span> <span class="string">&quot;All is ok.&quot;</span></span><br><span class="line"><span class="keyword">fi</span></span><br></pre></td></tr></table></figure>
+<p>多个条件</p>
+<figure class="highlight sh"><table><tr><td class="code"><pre><span class="line"><span class="keyword">if</span> [ ! -z <span class="string">&quot;<span class="variable">$nodeList</span>&quot;</span> ] &amp;&amp; [ <span class="string">&quot;<span class="variable">$cmd</span>&quot;</span> = <span class="string">&quot;<span class="variable">$cmdBuild</span>&quot;</span> ]; <span class="keyword">then</span></span><br><span class="line">	<span class="built_in">echo</span> <span class="string">&quot;Update cmd is empty, skip it.&quot;</span></span><br><span class="line"><span class="keyword">fi</span></span><br></pre></td></tr></table></figure>
+<p>switch型</p>
+<figure class="highlight sh"><table><tr><td class="code"><pre><span class="line"><span class="keyword">case</span> <span class="string">&quot;<span class="variable">$1</span>&quot;</span> <span class="keyword">in</span></span><br><span class="line">    -n) updateNodeList <span class="variable">$2</span>; <span class="built_in">shift</span>; <span class="built_in">shift</span>; ;;</span><br><span class="line">    --start) <span class="built_in">shift</span>; updateCmd <span class="variable">$cmdStart</span>; ;;</span><br><span class="line">    --stop) <span class="built_in">shift</span>; updateCmd <span class="variable">$cmdStop</span>; ;;</span><br><span class="line">    -b|--build) <span class="built_in">shift</span>; updateCmd <span class="variable">$cmdBuild</span>; ;;</span><br><span class="line">    -h|--<span class="built_in">help</span>) usage; ;;</span><br><span class="line">    *) error <span class="string">&quot;Unknown option(<span class="variable">$1</span>)&quot;</span>; usage; ;;</span><br><span class="line"><span class="keyword">esac</span></span><br></pre></td></tr></table></figure>
+<h2 id="循环">循环</h2>
+<p>while型</p>
+<figure class="highlight sh"><table><tr><td class="code"><pre><span class="line"><span class="keyword">while</span> [ -n <span class="string">&quot;<span class="variable">$1</span>&quot;</span> ]; <span class="keyword">do</span></span><br><span class="line">	<span class="built_in">echo</span> <span class="string">&quot;<span class="variable">$1</span>&quot;</span></span><br><span class="line">	<span class="built_in">shift</span></span><br><span class="line"><span class="keyword">done</span></span><br></pre></td></tr></table></figure>
+<p>for each型</p>
+<figure class="highlight sh"><table><tr><td class="code"><pre><span class="line"><span class="keyword">for</span> node <span class="keyword">in</span> <span class="variable">$nodeList</span>; <span class="keyword">do</span></span><br><span class="line">    <span class="built_in">echo</span> <span class="string">&quot;node: <span class="variable">$node</span>&quot;</span></span><br><span class="line"><span class="keyword">done</span></span><br></pre></td></tr></table></figure>
+<h2 id="函数">函数</h2>
+<h3 id="声明函数">声明函数</h3>
+<figure class="highlight sh"><table><tr><td class="code"><pre><span class="line"><span class="function"><span class="title">info</span></span>()</span><br><span class="line">&#123;</span><br><span class="line">    <span class="built_in">echo</span> <span class="string">&quot;\033[32m[INFO]&quot;</span> $*<span class="string">&quot;\033[0m&quot;</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>输入参数：$1~$9 分别代表参数1~9. $0为执行脚本文件路径</p>
+<p>返回参数：return [RET]，值为0-255；不写值为默认0；</p>
+<h3 id="调用函数">调用函数</h3>
+<p>直接调用</p>
+<figure class="highlight sh"><table><tr><td class="code"><pre><span class="line">$ info <span class="string">&quot;Exec cmd <span class="variable">$cmd</span>.&quot;</span> <span class="string">&quot;All is ok&quot;</span></span><br></pre></td></tr></table></figure>
+<p>获取返回值判断，类似三元表达式</p>
+<figure class="highlight sh"><table><tr><td class="code"><pre><span class="line"><span class="comment"># 单步处理可以直接写</span></span><br><span class="line">testPid <span class="variable">$pid</span> &amp;&amp; <span class="built_in">echo</span> <span class="string">&quot;<span class="variable">$pid</span> is ok&quot;</span> || <span class="built_in">echo</span> <span class="string">&quot;<span class="variable">$pid</span> is failed&quot;</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># 多步处理需要增加括号</span></span><br><span class="line">testPid <span class="variable">$pid</span> &amp;&amp; info <span class="string">&quot;<span class="variable">$node</span>(<span class="variable">$pid</span>) start done.&quot;</span> ||</span><br><span class="line">            (error <span class="string">&quot;<span class="variable">$node</span>(<span class="variable">$pid</span>) start failed.&quot;</span> &amp;&amp; <span class="built_in">echo</span> `<span class="built_in">tail</span> -n 5 <span class="variable">$pwdPath</span>/<span class="variable">$node</span>/<span class="variable">$&#123;node&#125;</span>_out.<span class="built_in">log</span>` &amp;&amp; <span class="built_in">exit</span> 255)</span><br></pre></td></tr></table></figure>
+<h2 id="常用命令">常用命令</h2>
+<h3 id="readlink">readlink</h3>
+<p>返回文件的绝对路径</p>
+<figure class="highlight sh"><table><tr><td class="code"><pre><span class="line">$ <span class="built_in">readlink</span> -f go.mod </span><br><span class="line">/root/project/softarch/go.mod</span><br></pre></td></tr></table></figure>
+<h3 id="dirname">dirname</h3>
+<p>返回文件或文件夹的上级路径</p>
+<figure class="highlight sh"><table><tr><td class="code"><pre><span class="line">$ <span class="built_in">dirname</span> ~/project/softarch</span><br><span class="line">/root/project</span><br></pre></td></tr></table></figure>
+<h3 id="echo">echo</h3>
+<p>显示字符串</p>
+<figure class="highlight sh"><table><tr><td class="code"><pre><span class="line"><span class="built_in">echo</span> <span class="string">&quot;hello world&quot;</span></span><br><span class="line"><span class="built_in">echo</span> <span class="string">&quot;hello world\n你好，世界\n&quot;</span></span><br></pre></td></tr></table></figure>
+<p>控制显示颜色</p>
+<figure class="highlight sh"><table><tr><td class="code"><pre><span class="line"><span class="comment"># 绿色字体</span></span><br><span class="line"><span class="built_in">echo</span> <span class="string">&quot;\033[32m[INFO] hello world\033[0m&quot;</span></span><br><span class="line"><span class="comment"># 黄色字体</span></span><br><span class="line"><span class="built_in">echo</span> <span class="string">&quot;\033[33m[WARN] hello world\033[0m&quot;</span></span><br><span class="line"><span class="comment"># 红色字体</span></span><br><span class="line"><span class="built_in">echo</span> <span class="string">&quot;\033[31m[ERROR] hello world\033[0m&quot;</span></span><br></pre></td></tr></table></figure>
+<h3 id="nohup">nohup</h3>
+<p>脱离终端启动程序</p>
+<p>启动程序时，获取程序运行pid</p>
+<figure class="highlight sh"><table><tr><td class="code"><pre><span class="line"><span class="built_in">nohup</span> ./<span class="variable">$node</span> &gt;<span class="variable">$pwdPath</span>/<span class="variable">$node</span>/<span class="variable">$&#123;node&#125;</span>_out.<span class="built_in">log</span> 2&gt;&amp;1 &amp; <span class="built_in">echo</span> $!&gt;/tmp/.<span class="variable">$&#123;node&#125;</span>.pid</span><br></pre></td></tr></table></figure>
+<h2 id="组合命令">组合命令</h2>
+<h3 id="显示当前路径下所有文件夹名称">显示当前路径下所有文件夹名称</h3>
+<figure class="highlight sh"><table><tr><td class="code"><pre><span class="line">$ <span class="built_in">ls</span> -d */ | awk <span class="string">&#x27;&#123;gsub(/\//,&quot;&quot;); print $0&#125;&#x27;</span></span><br><span class="line">app</span><br><span class="line">_install</span><br><span class="line">util</span><br></pre></td></tr></table></figure>
+]]></content>
+  </entry>
+  <entry>
+    <title>源码书籍推荐</title>
+    <url>/2023/09/28/%E6%BA%90%E7%A0%81%E4%B9%A6%E7%B1%8D%E6%8E%A8%E8%8D%90/</url>
+    <content><![CDATA[<p>Rust</p>
+<p><a href="http://oldlinux.org/">oldlinux</a></p>
+<p>《Linux内核0.11完全注释》0.11</p>
+<p>Bochs</p>
+<p>qemu+gdb</p>
+<p><a
+href="https://mp.weixin.qq.com/s?__biz=Mzk0MjE3NDE0Ng==&amp;mid=2247502498&amp;idx=1&amp;sn=01cf816694f74ca8437374a9aa23ab64&amp;chksm=c2c5b00ff5b23919c43ac96a38bc8b09f42ea17f92ea933157db3e7f0c77bb876bf7d0524afa&amp;cur_album_id=2123743679373688834&amp;scene=189#wechat_redirect">调试
+Linux 最早期的代码</a></p>
+<p>网上修改版本：https://github.com/yuan-xy/Linux-0.11</p>
+<p>ubuntu16.04.7</p>
+<figure class="highlight sh"><table><tr><td class="code"><pre><span class="line"><span class="comment"># 带UI启动qemu</span></span><br><span class="line">qemu-system-x86_64 -m 16M -boot a -fda Image -hda $(HDA_IMG) -s -S</span><br><span class="line"></span><br><span class="line"><span class="comment"># 其他终端启动gdb</span></span><br><span class="line">gdb tool/system</span><br><span class="line">target remote :1234</span><br><span class="line"></span><br><span class="line"><span class="comment"># VSCode ssh远程连接后启动调试</span></span><br></pre></td></tr></table></figure>
+<p>launch.json</p>
+<figure class="highlight json"><table><tr><td class="code"><pre><span class="line"><span class="punctuation">&#123;</span></span><br><span class="line">    <span class="attr">&quot;version&quot;</span><span class="punctuation">:</span> <span class="string">&quot;0.2.0&quot;</span><span class="punctuation">,</span></span><br><span class="line">    <span class="attr">&quot;configurations&quot;</span><span class="punctuation">:</span> <span class="punctuation">[</span></span><br><span class="line">        <span class="punctuation">&#123;</span></span><br><span class="line">            <span class="attr">&quot;name&quot;</span><span class="punctuation">:</span> <span class="string">&quot;gdb-0.11&quot;</span><span class="punctuation">,</span></span><br><span class="line">            <span class="attr">&quot;type&quot;</span><span class="punctuation">:</span> <span class="string">&quot;cppdbg&quot;</span><span class="punctuation">,</span></span><br><span class="line">            <span class="attr">&quot;request&quot;</span><span class="punctuation">:</span> <span class="string">&quot;launch&quot;</span><span class="punctuation">,</span></span><br><span class="line">            <span class="attr">&quot;program&quot;</span><span class="punctuation">:</span> <span class="string">&quot;$&#123;workspaceFolder&#125;/Linux-0.11-master/tools/system&quot;</span><span class="punctuation">,</span></span><br><span class="line">            <span class="attr">&quot;miDebuggerServerAddress&quot;</span><span class="punctuation">:</span> <span class="string">&quot;127.0.0.1:1234&quot;</span><span class="punctuation">,</span></span><br><span class="line">            <span class="attr">&quot;args&quot;</span><span class="punctuation">:</span> <span class="punctuation">[</span><span class="punctuation">]</span><span class="punctuation">,</span></span><br><span class="line">            <span class="attr">&quot;stopAtEntry&quot;</span><span class="punctuation">:</span> <span class="literal"><span class="keyword">false</span></span><span class="punctuation">,</span></span><br><span class="line">            <span class="attr">&quot;cwd&quot;</span><span class="punctuation">:</span> <span class="string">&quot;$&#123;workspaceFolder&#125;/Linux-0.11-master&quot;</span><span class="punctuation">,</span></span><br><span class="line">            <span class="attr">&quot;environment&quot;</span><span class="punctuation">:</span> <span class="punctuation">[</span><span class="punctuation">]</span><span class="punctuation">,</span></span><br><span class="line">            <span class="attr">&quot;externalConsole&quot;</span><span class="punctuation">:</span> <span class="literal"><span class="keyword">false</span></span><span class="punctuation">,</span></span><br><span class="line">            <span class="attr">&quot;MIMode&quot;</span><span class="punctuation">:</span> <span class="string">&quot;gdb&quot;</span></span><br><span class="line">        <span class="punctuation">&#125;</span></span><br><span class="line">    <span class="punctuation">]</span></span><br><span class="line"><span class="punctuation">&#125;</span></span><br></pre></td></tr></table></figure>
+<p>vscode打印内存地址数据，调试控制台</p>
+<figure class="highlight sh"><table><tr><td class="code"><pre><span class="line"><span class="comment"># 执行gdb命令x，打印0x0处内存，打印32字节</span></span><br><span class="line"><span class="comment"># xb，字节（默认）</span></span><br><span class="line"><span class="comment"># xw，4字节</span></span><br><span class="line">-<span class="built_in">exec</span> x/32xb 0x0</span><br></pre></td></tr></table></figure>
+<p><a
+href="http://ftp.sjtu.edu.cn/sites/ftp.kernel.org/pub/linux/kernel/">正式源码下载</a></p>
+<p>《Linux内核源代码情景分析》 2.4.0</p>
+<p>《Linux Kernel Development》2.6</p>
+<p>qemu+gdb</p>
+]]></content>
+  </entry>
+  <entry>
+    <title>常用工具-Perf简介</title>
+    <url>/2023/09/28/%E5%B8%B8%E7%94%A8%E5%B7%A5%E5%85%B7-Perf%E7%AE%80%E4%BB%8B/</url>
+    <content><![CDATA[<p>Linux性能调试工具</p>
+<h2 id="简介">简介</h2>
+<p>perf是Linux 2.6+内核中的一个工具，在内核源码包中的位置
+tools/perf。</p>
+<p>perf利用Linux的trace特性，可以用于实时跟踪，统计event计数(perf
+stat)；或者使用采样(perf record)，报告(perf
+report|script|annotate)的使用方式进行诊断。</p>
+<p>perf命令行接口并不能利用所有的Linux
+trace特性，有些trace需要通过ftrace接口得到。</p>
+<p>参考<a
+href="https://github.com/brendangregg/perf-tools">perf-tools</a>。</p>
+<h2 id="安装">安装</h2>
+<p>Ubuntu20.04直接安装</p>
+<figure class="highlight sh"><table><tr><td class="code"><pre><span class="line">apt-get install linux-tools-$(<span class="built_in">uname</span> -r) linux-tools-generic</span><br></pre></td></tr></table></figure>
+<h2 id="使用">使用</h2>
+<p>运行程序后获取<code>pid</code></p>
+<figure class="highlight sh"><table><tr><td class="code"><pre><span class="line">perf record -a -g -v -p &lt;PID&gt; <span class="built_in">sleep</span> 30</span><br></pre></td></tr></table></figure>
+<p>等待30秒后会得到<code>perf.data</code>原始记录文件，直接查看</p>
+<figure class="highlight sh"><table><tr><td class="code"><pre><span class="line">perf report -g --tui</span><br></pre></td></tr></table></figure>
+<p>生成火焰图<code>perf-main.svg</code></p>
+<figure class="highlight sh"><table><tr><td class="code"><pre><span class="line">git <span class="built_in">clone</span> https://github.com/brendangregg/FlameGraph</span><br><span class="line"><span class="built_in">mv</span> perf.data FlameGraph/</span><br><span class="line"><span class="built_in">cd</span> FlameGraph</span><br><span class="line">perf script | ./stackcollapse-perf.pl | ./flamegraph.pl &gt; perf-main.svg</span><br></pre></td></tr></table></figure>
+<p><code>perf-main.svg</code>需要使用浏览器打开，即可方便查看</p>
+<p>生成热力图类似</p>
+<figure class="highlight sh"><table><tr><td class="code"><pre><span class="line">git <span class="built_in">clone</span> https://github.com/brendangregg/HeatMap      <span class="comment"># or download it from github</span></span><br><span class="line"><span class="built_in">mv</span> perf.data HeatMap/</span><br><span class="line"><span class="built_in">cd</span> HeatMap</span><br><span class="line">perf script | awk <span class="string">&#x27;&#123; gsub(/:/, &quot;&quot;) &#125; $5 ~ /issue/ &#123; ts[$6, $10] = $4 &#125; $5 ~ /complete/ &#123; if (l = ts[$6, $9]) &#123; printf &quot;%.f %.f\n&quot;, $4 * 1000000, ($4 - l) * 1000000; ts[$6, $10] = 0 &#125; &#125;&#x27;</span> &gt; out.lat_us</span><br><span class="line">./trace2heatmap.pl --unitstime=us --unitslat=us --maxlat=50000 out.lat_us &gt; out.svg</span><br></pre></td></tr></table></figure>
 ]]></content>
   </entry>
   <entry>
@@ -5311,6 +5775,271 @@ Man ​ 原型链 ​ 原型对象会指向父级? ​ 顶级对象是Object ​
 当访问属性或方法时，优先查找本地，没有再到父级中查找，直到为null ​
 instanceof</p>
 ]]></content>
+  </entry>
+  <entry>
+    <title>CentOS7使用</title>
+    <url>/2023/09/28/CentOS7%E4%BD%BF%E7%94%A8/</url>
+    <content><![CDATA[<h1 id="网络配置">网络配置</h1>
+<p>修改配置文件/etc/sysconfig/network-scripts/ifcfg-xxx</p>
+]]></content>
+      <categories>
+        <category>Linux</category>
+      </categories>
+  </entry>
+  <entry>
+    <title>常用工具-Valgrind简介</title>
+    <url>/2023/09/28/%E5%B8%B8%E7%94%A8%E5%B7%A5%E5%85%B7-Valgrind%E7%AE%80%E4%BB%8B/</url>
+    <content><![CDATA[<p>Linux内存泄漏工具</p>
+<h2 id="简介">简介</h2>
+<p>详细信息可以查阅<a href="https://valgrind.org/">官方网站</a>。</p>
+<p>Valgrind是一套Linux下，开放源代码（GPL
+V2）的仿真调试工具的集合。Valgrind由内核（core）以及基于内核的其他调试工具组成。内核类似于一个框架（framework），它模拟了一个CPU环境，并提供服务给其他工具；而其他工具则类似于插件
+(plug-in)，利用内核提供的服务完成各种特定的内存调试任务。</p>
+<h2 id="安装">安装</h2>
+<p>ubuntu20.04直接安装，版本为3.15.0</p>
+<figure class="highlight sh"><table><tr><td class="code"><pre><span class="line">apt-get install valgrind</span><br></pre></td></tr></table></figure>
+<h2 id="使用">使用</h2>
+<h3 id="准备程序">准备程序</h3>
+<p>需要使用<code>-g</code>将调试信息编译到程序中，以便<code>Memcheck</code>工具输出准确行数。优化参数最好是使用<code>-O0</code>或<code>-O1</code>，使用<code>-O2</code>及以上等级或存在错误上报的可能。</p>
+<h3 id="memcheck运行程序">Memcheck运行程序</h3>
+<p>若程序正常运行为</p>
+<figure class="highlight sh"><table><tr><td class="code"><pre><span class="line">myprog arg1 arg2</span><br></pre></td></tr></table></figure>
+<p>则使用valgrind运行时</p>
+<figure class="highlight sh"><table><tr><td class="code"><pre><span class="line">valgrind --leak-check=all myprog arg1 arg2</span><br></pre></td></tr></table></figure>
+<p><code>Memcheck</code>工具是默认项。<code>--leak-check</code>选项指定检查项细节。</p>
+<p>程序会比正常运行慢一些，并会占用更多的内存。</p>
+<h2 id="常见错误检测">常见错误检测</h2>
+<ul>
+<li>内存未释放（definitely/indirectly/possibly lost）</li>
+<li>内存越界访问（Invalid read/write）</li>
+<li>内存释放后读写（Invalid read/write）</li>
+<li>内存错误释放（Mismatched free() / delete / delete []）</li>
+<li>内存重复释放（Invalid free() / delete / delete[] / realloc()）</li>
+</ul>
+]]></content>
+  </entry>
+  <entry>
+    <title>常用工具-Git简介</title>
+    <url>/2023/09/28/%E5%B8%B8%E7%94%A8%E5%B7%A5%E5%85%B7-Git%E7%AE%80%E4%BB%8B/</url>
+    <content><![CDATA[<h2 id="流程介绍">流程介绍</h2>
+<h3 id="基本原则">基本原则</h3>
+<ul>
+<li><p><strong>简单</strong>。不增加过多学习成本，开发测试快速迭代。</p></li>
+<li><p><strong>可追溯</strong>。每个现场环境运行的软件版本号都由主仓发布，主仓关键分支禁用代码强制提交。</p></li>
+</ul>
+<h3 id="简化流程">简化流程</h3>
+<p>所有开发人员都从主仓的开发分支克隆(clone)代码。在本地修改代码，本地仓新增(add)提交。待所有代码调试完毕，准备推送(push)到主仓。在推送主仓前先获取(fetch)主仓最新提交记录。</p>
+<figure>
+<embed
+src="http://192.168.10.234:4999/server/index.php?s=/api/attachment/visitFile/sign/d54bea1dc7d72a6e7482bb84b59781ce&amp;showdoc=.jpg" />
+<figcaption aria-hidden="true">简化开发流程图</figcaption>
+</figure>
+<h3 id="完整流程">完整流程</h3>
+<p>私有仓从主仓派生（fork），本地仓从私有仓克隆（clone）。</p>
+<p>主仓所有开发人员只能发起合并请求（merge），禁止发起推送请求（push），经仓负责人检视后合入主仓。主仓只有开发（develop）分支接受私有仓代码合并请求，其他分支不接受私有仓代码合并请求。</p>
+<figure>
+<embed
+src="http://192.168.10.234:4999/server/index.php?s=/api/attachment/visitFile/sign/7ee3cb46db8b9552801902a533dcb233&amp;showdoc=.jpg" />
+<figcaption aria-hidden="true">整体开发流程图</figcaption>
+</figure>
+<h2 id="版本管理">版本管理</h2>
+<h3 id="版本号规范">版本号规范</h3>
+<p>版本号基本结构：<strong>v主版本号.子版本号.修订版本号</strong>。版本号会以标签（TAG）的方式指向各分支的某次提交记录。</p>
+<blockquote>
+<p>参考：产品中心发布的<a
+href="http://192.168.10.234:4999/web/#/13?page_id=91">版本号命名规范</a></p>
+</blockquote>
+<p><strong>主版本号</strong></p>
+<ol type="1">
+<li>大的代码重构导致此版本号变更；</li>
+<li>主版本号变更可能导致向下兼容问题；</li>
+</ol>
+<p><strong>子版本号</strong></p>
+<ol type="1">
+<li>有大的功能变动；</li>
+<li>可能影响向下兼容，但是可以通过技术手段进行数据或者业务转换；</li>
+</ol>
+<p><strong>修订版本号</strong></p>
+<ol type="1">
+<li>修改程序内部 bug，程序功能无变化；</li>
+<li>绝对向下兼容；</li>
+</ol>
+<h3 id="分支策略">分支策略</h3>
+<ul>
+<li><strong>develop</strong>（开发分支）：主仓默认分支，日常开发活跃分支，一般包含未经严格测试的提交记录。</li>
+<li><strong>v主版本号.子版本号.x</strong>（发布分支）：是测试或现场环境运行的软件版本对应的代码。</li>
+</ul>
+<p>以上两类分支会开启分支保护策略，禁止强制推送。</p>
+<p>修订版本号为0的标签会指向开发分支和相应的发布分支，而修订版本号非0的标签只会指向相应的发布分支。</p>
+<blockquote>
+<p>例如：版本号为v1.6.0的标签会同时指向开发分支和v1.6.x的发布分支。而版本号为v1.6.2的标签只会指向v1.6.x的发布分支。</p>
+</blockquote>
+<h3 id="提交记录">提交记录</h3>
+<p>提交记录信息基本结构：提交类型[问题单号或任务编号]: 提交信息</p>
+<p><strong>提交类型</strong></p>
+<ul>
+<li><strong>feat</strong>（功能特性）：主要是核心代码新增或修改功能特性，包括性能优化和代码重构；</li>
+<li><strong>fix</strong>（修复问题）：主要是修复核心代码中发现的问题；</li>
+<li><strong>other</strong>（其他事务）：主要是新增或修改非核心代码，比如构建脚本、代码版本号、新增环境等等。</li>
+</ul>
+<p><strong>提交信息</strong></p>
+<ul>
+<li><p>提交信息尽量简短（100字以内）介绍本次提交的目的</p></li>
+<li><p>提交信息尽量携带<strong>问题单号</strong>或<strong>任务编号</strong></p></li>
+<li><p>单次提交实现单个特性或修复单个问题</p></li>
+</ul>
+<p><strong>标准提交示例</strong></p>
+<figure class="highlight sh"><table><tr><td class="code"><pre><span class="line"><span class="comment"># 功能特性提交记录</span></span><br><span class="line">【推荐】feat1549: 增加登录功能，并对用户权限进行校验</span><br><span class="line">【不推荐】feat: 修改登录功能，忽略对管理员权限进行校验</span><br><span class="line"><span class="comment"># 修复问题提交记录</span></span><br><span class="line">【推荐】fix8317: 修复校验用户权限时，并发访问公共队列造成崩溃的问题</span><br><span class="line">【不推荐】fix: 修复校验管理员权限时，跳过校验普通用户权限的问题</span><br><span class="line"><span class="comment"># 其他事务提交记录</span></span><br><span class="line">【推荐】other1349: 部署脚本打包增加检索服务</span><br><span class="line">【不推荐】other: 部署版本信息修改为v1.8.5</span><br></pre></td></tr></table></figure>
+<h3 id="提交策略">提交策略</h3>
+<ul>
+<li><p><strong>功能特性</strong>和<strong>其他事务</strong>的提交都只需要合并到<strong>开发分支</strong>即可；</p></li>
+<li><p><strong>修复问题</strong>的提交除了合并到对应的<strong>发布分支</strong>上，还需要调整后合并到<strong>开发分支</strong>中；</p></li>
+</ul>
+<h2 id="测试发布流程">测试发布流程</h2>
+<p>对于分支的提测，若没有相应的发布分支，项目负责人需要在新建</p>
+<p>对于发布分支的提测，项目负责人只需在发布分支上打<strong>v主版本号.子版本号.x</strong>的标签和记录Changelog。</p>
+<figure>
+<embed
+src="http://192.168.10.234:4999/server/index.php?s=/api/attachment/visitFile/sign/c34484a81f91573818a7ac6826300928&amp;showdoc=.jpg" />
+<figcaption aria-hidden="true">测试发布流程图</figcaption>
+</figure>
+<h2 id="常用命令">常用命令</h2>
+<p>以下命令格式常用命令格式，详细可选参数可以查询Git手册获取。</p>
+<h3 id="约定">约定</h3>
+<p><code>&lt;XX&gt;</code>必填参数</p>
+<p><code>[XX]</code>可选参数</p>
+<p><code>REPO_NAME</code>Git仓库名称，示例：origin</p>
+<p><code>REPO</code>Git仓库地址，示例：http://ubuntu.alfdxl.top/gitea-admin/git-template.git</p>
+<p><code>BRANCH</code>分支名称，示例：feat_adminuser</p>
+<p><code>TAG</code>标签名称，示例：v1.2.6</p>
+<p><code>MESSAGE</code>提交消息，示例：feat698:
+新增创建管理员用户和查询用户信息功能</p>
+<p><code>ID</code>提交记录，示例：3110aa8502d24022cd08ba37d5dacd5160709214</p>
+<p><code>PATH</code>文件夹路径，示例：template</p>
+<p><code>HEAD</code>Git保留字段，指向分支当前提交记录</p>
+<h3 id="clone">clone</h3>
+<p>克隆一个Git仓库到本地，可以查看或修改此项目。基本格式：<code>git clone &lt;REPO&gt; [PATH]</code></p>
+<p>Git仓库地址支持<code>HTTP</code>和<code>SSH</code>协议。<code>HTTP</code>协议不会保存用户信息，在拷贝过程中也不会验证用户权限。但在推送本地信息时会要求用户进行验证，常常用于代码查看活动。<code>SSH</code>协议本身已经保存用户信息，推送本地信息时不会要求用户输入信息，常常用于代码开发活动。<code>SSH</code>协议需要提前配置，Gitlab的相关配置可以参考<a
+href="https://blog.csdn.net/ycuzrz112280/article/details/119816468">文章</a>。</p>
+<p>使用示例：</p>
+<figure class="highlight shell"><table><tr><td class="code"><pre><span class="line"><span class="meta prompt_"># </span><span class="language-bash">克隆代码到本地</span></span><br><span class="line"><span class="meta prompt_">$ </span><span class="language-bash">git <span class="built_in">clone</span> http://ubuntu.alfdxl.top/gitea-admin/git-template.git template</span></span><br><span class="line">Cloning into &#x27;template&#x27;...</span><br><span class="line">remote: Enumerating objects: 61, done.</span><br><span class="line">remote: Counting objects: 100% (61/61), done.</span><br><span class="line">remote: Compressing objects: 100% (40/40), done.</span><br><span class="line">remote: Total 61 (delta 9), reused 0 (delta 0), pack-reused 0</span><br><span class="line">Receiving objects: 100% (61/61), 5.07 KiB | 2.53 MiB/s, done.</span><br><span class="line">Resolving deltas: 100% (9/9), done.</span><br></pre></td></tr></table></figure>
+<h3 id="remote">remote</h3>
+<p>管理远程Git仓库，每个仓库都有名称，默认克隆的仓库名称都为<code>origin</code>。</p>
+<p>查看远程仓详情：<code>git remote -v</code></p>
+<p>新增远程仓：<code>git remote add &lt;REPO_NAME&gt; &lt;REPO&gt;</code></p>
+<p>删除远程仓：<code>git remote rm &lt;REPO_NAME&gt;</code></p>
+<p>使用示例：</p>
+<figure class="highlight shell"><table><tr><td class="code"><pre><span class="line"><span class="meta prompt_"># </span><span class="language-bash">查看远程仓</span></span><br><span class="line"><span class="meta prompt_">$ </span><span class="language-bash">git remote -v</span></span><br><span class="line">origin  http://ubuntu.alfdxl.top/gitea-admin/git-template.git (fetch)</span><br><span class="line">origin  http://ubuntu.alfdxl.top/gitea-admin/git-template.git (push)</span><br><span class="line"><span class="meta prompt_"></span></span><br><span class="line"><span class="meta prompt_"># </span><span class="language-bash">新增远程仓</span></span><br><span class="line"><span class="meta prompt_">$ </span><span class="language-bash">git remote add ssh_remote ssh://git@ubuntu.alfdxl.top:222/gitea-admin/git-template.git</span></span><br><span class="line"><span class="meta prompt_">$ </span><span class="language-bash">git remote -v</span>                                                                         </span><br><span class="line">origin  http://ubuntu.alfdxl.top/gitea-admin/git-template.git (fetch)</span><br><span class="line">origin  http://ubuntu.alfdxl.top/gitea-admin/git-template.git (push)</span><br><span class="line">ssh_remote      ssh://git@ubuntu.alfdxl.top:222/gitea-admin/git-template.git (fetch)</span><br><span class="line">ssh_remote      ssh://git@ubuntu.alfdxl.top:222/gitea-admin/git-template.git (push)</span><br><span class="line"><span class="meta prompt_"></span></span><br><span class="line"><span class="meta prompt_"># </span><span class="language-bash">删除远程仓</span></span><br><span class="line"><span class="meta prompt_">$ </span><span class="language-bash">git remote <span class="built_in">rm</span> ssh_remote</span> </span><br><span class="line"><span class="meta prompt_">$ </span><span class="language-bash">git remote -v</span>           </span><br><span class="line">origin  http://ubuntu.alfdxl.top/gitea-admin/git-template.git (fetch)</span><br><span class="line">origin  http://ubuntu.alfdxl.top/gitea-admin/git-template.git (push)</span><br></pre></td></tr></table></figure>
+<h3 id="checkout">checkout</h3>
+<p>分支切换和恢复工作区，基本格式：<code>git checkout &lt;BRANCH&gt;</code></p>
+<p>使用示例：</p>
+<figure class="highlight shell"><table><tr><td class="code"><pre><span class="line"><span class="meta prompt_"># </span><span class="language-bash">本地拉取远程指定分支代码</span></span><br><span class="line"><span class="meta prompt_">$ </span><span class="language-bash">git checkout -b feat_adminuser origin/feat_adminuser</span></span><br><span class="line">Branch &#x27;feat_adminuser&#x27; set up to track remote branch &#x27;feat_adminuser&#x27; from &#x27;origin&#x27;.</span><br><span class="line">Switched to a new branch &#x27;feat_adminuser&#x27;</span><br><span class="line"><span class="meta prompt_"></span></span><br><span class="line"><span class="meta prompt_"># </span><span class="language-bash">切换分支</span></span><br><span class="line"><span class="meta prompt_">$ </span><span class="language-bash">git checkout master</span></span><br><span class="line">Switched to branch &#x27;master&#x27;</span><br><span class="line">Your branch is up to date with &#x27;origin/master&#x27;.</span><br></pre></td></tr></table></figure>
+<h3 id="branch">branch</h3>
+<p>代码分支管理。</p>
+<p>查看所有分支：<code>git branch -a</code></p>
+<p>删除分支：<code>git branch -d &lt;BRANCH&gt;</code></p>
+<p>使用示例：</p>
+<figure class="highlight shell"><table><tr><td class="code"><pre><span class="line"><span class="meta prompt_"># </span><span class="language-bash">查看所有分支</span></span><br><span class="line"><span class="meta prompt_">$ </span><span class="language-bash">git branch -a</span></span><br><span class="line">* feat_adminuser</span><br><span class="line">  master</span><br><span class="line">  remotes/origin/HEAD -&gt; origin/master</span><br><span class="line">  remotes/origin/feat_adminuser</span><br><span class="line">  remotes/origin/feat_build</span><br><span class="line">  remotes/origin/master</span><br><span class="line"><span class="meta prompt_"></span></span><br><span class="line"><span class="meta prompt_"># </span><span class="language-bash">删除分支</span></span><br><span class="line"><span class="meta prompt_">$ </span><span class="language-bash">git branch -d feat_adminuser</span></span><br><span class="line">warning: deleting branch &#x27;feat_adminuser&#x27; that has been merged to</span><br><span class="line">         &#x27;refs/remotes/origin/feat_adminuser&#x27;, but not yet merged to HEAD.</span><br><span class="line">Deleted branch feat_adminuser (was 3110aa8).</span><br></pre></td></tr></table></figure>
+<h3 id="log">log</h3>
+<p>查看提交记录。基本格式：<code>git log</code></p>
+<p>使用示例：</p>
+<figure class="highlight shell"><table><tr><td class="code"><pre><span class="line"><span class="meta prompt_"># </span><span class="language-bash">查看提交记录</span></span><br><span class="line"><span class="meta prompt_">$ </span><span class="language-bash">git <span class="built_in">log</span></span></span><br><span class="line">commit 3110aa8502d24022cd08ba37d5dacd5160709214 (HEAD -&gt; feat_adminuser, tag: v1.2.3, origin/feat_adminuser)</span><br><span class="line">Author: 作者姓名 &lt;作者邮箱&gt;</span><br><span class="line">Date:   Tue May 10 11:41:36 2022 +0800</span><br><span class="line"></span><br><span class="line">    feat698: 新增创建管理员用户和查询用户信息功能；</span><br><span class="line"></span><br><span class="line">commit 82f2ba7b82fa91335f3d226e3fee61cedea65945</span><br><span class="line">Author: 作者姓名 &lt;作者邮箱&gt;</span><br><span class="line">Date:   Mon May 9 16:33:14 2022 +0800</span><br><span class="line"></span><br><span class="line">    fix696: 修复修改用户名都为常量的问题</span><br><span class="line"></span><br><span class="line">commit bbb843b97d714df441275c488c8bd2f131efe42c (tag: v1.2.6, origin/master, origin/HEAD, master)</span><br><span class="line">Author: zhangsan &lt;zhangsan1598@gmail.com&gt;</span><br><span class="line">Date:   Mon May 9 16:09:27 2022 +0800</span><br><span class="line"></span><br><span class="line">    feat1599: 新增修改用户名称的功能</span><br><span class="line"></span><br><span class="line">commit 1ad9bce14ad8548c5b28bdd91398a3e4664909c5</span><br><span class="line">Author: 作者姓名 &lt;作者邮箱&gt;</span><br><span class="line">Date:   Mon May 9 14:59:13 2022 +0800</span><br><span class="line"></span><br><span class="line">    feat1598: 新增创建用户的功能</span><br><span class="line"></span><br><span class="line">commit 89b4f2cf3cd950686708d390126dec20da330257</span><br><span class="line">Author: 作者姓名 &lt;作者邮箱&gt;</span><br><span class="line">Date:   Mon May 9 14:50:36 2022 +0800</span><br><span class="line"></span><br><span class="line">    other1598: 建立代码仓库</span><br></pre></td></tr></table></figure>
+<h3 id="tag">tag</h3>
+<p>标签管理。基本格式：<code>git tag &lt;TAG&gt;</code></p>
+<p>查看本地标签：<code>git tag -l</code></p>
+<p>新增本地标签：<code>git tag &lt;TAG&gt;</code></p>
+<p>删除本地标签：<code>git tag -d &lt;TAG&gt;</code></p>
+<p>使用示例：</p>
+<figure class="highlight shell"><table><tr><td class="code"><pre><span class="line"><span class="meta prompt_"># </span><span class="language-bash">查看本地标签</span></span><br><span class="line"><span class="meta prompt_">$ </span><span class="language-bash">git tag -l</span></span><br><span class="line">v1.2.3</span><br><span class="line">v1.2.6</span><br><span class="line"><span class="meta prompt_"></span></span><br><span class="line"><span class="meta prompt_"># </span><span class="language-bash">新增本地标签</span></span><br><span class="line"><span class="meta prompt_">$ </span><span class="language-bash">git tag v1.2.3</span></span><br><span class="line"><span class="meta prompt_"></span></span><br><span class="line"><span class="meta prompt_"># </span><span class="language-bash">删除本地标签</span></span><br><span class="line"><span class="meta prompt_">$ </span><span class="language-bash">git tag -d v1.2.3</span></span><br><span class="line">Deleted tag &#x27;v1.2.3&#x27; (was 3110aa8)</span><br></pre></td></tr></table></figure>
+<h3 id="addrm">add/rm</h3>
+<p>暂存区文件管理。暂存区的代码不会生成提交记录。</p>
+<p>暂存区新增文件：<code>git add &lt;FILE&gt;</code></p>
+<p>暂存区删除文件：<code>git rm &lt;FILE&gt;</code></p>
+<p>使用示例：</p>
+<figure class="highlight shell"><table><tr><td class="code"><pre><span class="line"><span class="meta prompt_"># </span><span class="language-bash">暂存区新增文件</span></span><br><span class="line"><span class="meta prompt_">$ </span><span class="language-bash">git add .</span></span><br><span class="line"><span class="meta prompt_">$ </span><span class="language-bash">git add gw/*</span></span><br><span class="line"><span class="meta prompt_">$ </span><span class="language-bash">git add gw/cmd/main.go</span></span><br><span class="line"><span class="meta prompt_"></span></span><br><span class="line"><span class="meta prompt_"># </span><span class="language-bash">暂存区删除文件</span></span><br><span class="line"><span class="meta prompt_">$ </span><span class="language-bash">git <span class="built_in">rm</span> gw/internal/info/version.go</span> </span><br><span class="line">rm &#x27;gw/internal/info/version.go&#x27;</span><br></pre></td></tr></table></figure>
+<h3 id="commit">commit</h3>
+<p>将暂存区的文件提交到本地仓。基本格式：<code>git commit -m &lt;MESSAGE&gt;</code></p>
+<p>使用示例：</p>
+<figure class="highlight shell"><table><tr><td class="code"><pre><span class="line"><span class="meta prompt_"># </span><span class="language-bash">提交到本地仓</span></span><br><span class="line"><span class="meta prompt_">$ </span><span class="language-bash">git commit -m <span class="string">&quot;fix866: 修复版本不匹配引起服务崩溃问题&quot;</span></span></span><br><span class="line">[master 3d4bf3c] fix866: 修复版本不匹配引起服务崩溃问题</span><br><span class="line"> 3 files changed, 1 insertion(+), 6 deletions(-)</span><br><span class="line"> delete mode 100644 gw/internal/info/version.go</span><br></pre></td></tr></table></figure>
+<h3 id="status">status</h3>
+<p>工作区状态查询。基本格式：<code>git status</code></p>
+<p>使用示例：</p>
+<figure class="highlight shell"><table><tr><td class="code"><pre><span class="line"><span class="meta prompt_"># </span><span class="language-bash">无任何修改或提交的工作区状态查询</span></span><br><span class="line"><span class="meta prompt_">$ </span><span class="language-bash">git status</span>  </span><br><span class="line">On branch master</span><br><span class="line">Your branch is up to date with &#x27;origin/master&#x27;.</span><br><span class="line"></span><br><span class="line">nothing to commit, working tree clean</span><br><span class="line"><span class="meta prompt_"></span></span><br><span class="line"><span class="meta prompt_"># </span><span class="language-bash">有修改为提交的工作区状态查询</span></span><br><span class="line"><span class="meta prompt_">$ </span><span class="language-bash">git status</span>                        </span><br><span class="line">On branch master</span><br><span class="line">Your branch is ahead of &#x27;origin/master&#x27; by 2 commits.</span><br><span class="line">  (use &quot;git push&quot; to publish your local commits)</span><br><span class="line"></span><br><span class="line">Changes to be committed:</span><br><span class="line">  (use &quot;git restore --staged &lt;file&gt;...&quot; to unstage)</span><br><span class="line">        modified:   gw/cmd/main.go</span><br><span class="line">        deleted:    gw/internal/info/version.go</span><br><span class="line"></span><br><span class="line">Changes not staged for commit:</span><br><span class="line">  (use &quot;git add &lt;file&gt;...&quot; to update what will be committed)</span><br><span class="line">  (use &quot;git restore &lt;file&gt;...&quot; to discard changes in working directory)</span><br><span class="line">        modified:   go.mod</span><br><span class="line"></span><br><span class="line">Untracked files:</span><br><span class="line">  (use &quot;git add &lt;file&gt;...&quot; to include in what will be committed)</span><br><span class="line">        ReadMe.md</span><br><span class="line"><span class="meta prompt_"></span></span><br><span class="line"><span class="meta prompt_"># </span><span class="language-bash">有提交未推送的工作区状态查询</span></span><br><span class="line"><span class="meta prompt_">$ </span><span class="language-bash">git status</span></span><br><span class="line">On branch master</span><br><span class="line">Your branch is ahead of &#x27;origin/master&#x27; by 3 commits.</span><br><span class="line">  (use &quot;git push&quot; to publish your local commits)</span><br><span class="line"></span><br><span class="line">nothing to commit, working tree clean</span><br></pre></td></tr></table></figure>
+<h3 id="reset">reset</h3>
+<p>重置工作区指向的提交，即可以回退版本也可以撤销回退。</p>
+<p>强制重置工作区：<code>git reset --hard &lt;ID&gt;</code></p>
+<p>工作区回退N次提交：<code>git reset --hard HEAD~&lt;N&gt;</code></p>
+<p>撤销工作区提交：<code>git reset --soft &lt;ID&gt;</code></p>
+<p>工作区撤销N次提交：<code>git reset --soft HEAD~&lt;N&gt;</code></p>
+<p>使用示例：</p>
+<figure class="highlight shell"><table><tr><td class="code"><pre><span class="line"><span class="meta prompt_"># </span><span class="language-bash">强制重置工作区</span></span><br><span class="line"><span class="meta prompt_">$ </span><span class="language-bash">git reset --hard 82f2ba7b82fa91335f3d226e3fee61cedea65945</span></span><br><span class="line">HEAD is now at 82f2ba7 fix696: 修复修改用户名都为常量的问题</span><br><span class="line"><span class="meta prompt_">$ </span><span class="language-bash">git reset --hard v1.2.3</span>                                  </span><br><span class="line">HEAD is now at 3110aa8 feat698: 新增创建管理员用户和查询用户信息功能；</span><br><span class="line"><span class="meta prompt_">$ </span><span class="language-bash">git reset --hard origin/master</span>     </span><br><span class="line">HEAD is now at bbb843b feat1599: 新增修改用户名称的功能</span><br><span class="line"><span class="meta prompt_"></span></span><br><span class="line"><span class="meta prompt_"># </span><span class="language-bash">工作区回退2次提交</span></span><br><span class="line"><span class="meta prompt_">$ </span><span class="language-bash">git reset --hard HEAD~2</span>                                  </span><br><span class="line">HEAD is now at 82f2ba7 fix696: 修复修改用户名都为常量的问题</span><br><span class="line"><span class="meta prompt_"></span></span><br><span class="line"><span class="meta prompt_"># </span><span class="language-bash">撤销工作区提交</span></span><br><span class="line"><span class="meta prompt_">$ </span><span class="language-bash">git reset --soft 82f2ba7b82fa91335f3d226e3fee61cedea65945</span></span><br><span class="line"><span class="meta prompt_"></span></span><br><span class="line"><span class="meta prompt_"># </span><span class="language-bash">工作区撤销2次提交</span></span><br><span class="line"><span class="meta prompt_">$ </span><span class="language-bash">git reset --soft HEAD~2</span></span><br></pre></td></tr></table></figure>
+<h3 id="pull">pull</h3>
+<p>获取远程仓最新提交记录并与本地记录进行合并。基本格式：<code>git pull [REPO_NAME]</code></p>
+<p>使用示例：</p>
+<figure class="highlight shell"><table><tr><td class="code"><pre><span class="line"><span class="meta prompt_"># </span><span class="language-bash">拉取代码</span></span><br><span class="line"><span class="meta prompt_">$ </span><span class="language-bash">git pull</span>       </span><br><span class="line">remote: Enumerating objects: 9, done.</span><br><span class="line">remote: Counting objects: 100% (9/9), done.</span><br><span class="line">remote: Compressing objects: 100% (4/4), done.</span><br><span class="line">remote: Total 5 (delta 1), reused 0 (delta 0), pack-reused 0</span><br><span class="line">Unpacking objects: 100% (5/5), 435 bytes | 435.00 KiB/s, done.</span><br><span class="line">From http://ubuntu.alfdxl.top/gitea-admin/git-template</span><br><span class="line">   fbd7e0a..01df67e  feat_adminuser -&gt; origin/feat_adminuser</span><br><span class="line">Already up to date.</span><br></pre></td></tr></table></figure>
+<h3 id="fetch">fetch</h3>
+<p>获取远程仓提交记录。基本格式：<code>git fetch [REPO_NAME]</code></p>
+<p>使用示例：</p>
+<figure class="highlight shell"><table><tr><td class="code"><pre><span class="line"><span class="meta prompt_"># </span><span class="language-bash">远程仓无变更</span></span><br><span class="line"><span class="meta prompt_">$ </span><span class="language-bash">git fetch</span></span><br><span class="line"><span class="meta prompt_"></span></span><br><span class="line"><span class="meta prompt_"># </span><span class="language-bash">远程仓有变更</span></span><br><span class="line"><span class="meta prompt_">$ </span><span class="language-bash">git fetch</span></span><br><span class="line">remote: Enumerating objects: 9, done.</span><br><span class="line">remote: Counting objects: 100% (9/9), done.</span><br><span class="line">remote: Compressing objects: 100% (4/4), done.</span><br><span class="line">remote: Total 5 (delta 1), reused 0 (delta 0), pack-reused 0</span><br><span class="line">Unpacking objects: 100% (5/5), 433 bytes | 433.00 KiB/s, done.</span><br><span class="line">From http://ubuntu.alfdxl.top/gitea-admin/git-template</span><br><span class="line">   3110aa8..fbd7e0a  feat_adminuser -&gt; origin/feat_adminuser</span><br></pre></td></tr></table></figure>
+<h3 id="rebase">rebase</h3>
+<p>对本地分支进行变基操作。即缓存所有本地提交，将本地的基底与远程仓合并，再依次提交缓存的本地提交。与pull操作最大的不同是rebase操作可以保持提交记录的清晰度，参考<a
+href="https://blog.csdn.net/qq_29850249/article/details/114484583">文章</a>。基本格式：<code>git rebase [REPO_NAME]</code></p>
+<p>使用示例：</p>
+<figure class="highlight shell"><table><tr><td class="code"><pre><span class="line"><span class="meta prompt_"># </span><span class="language-bash">变基操作</span></span><br><span class="line"><span class="meta prompt_">$ </span><span class="language-bash">git pull</span>       </span><br><span class="line">remote: Enumerating objects: 9, done.</span><br><span class="line">remote: Counting objects: 100% (9/9), done.</span><br><span class="line">remote: Compressing objects: 100% (4/4), done.</span><br><span class="line">remote: Total 5 (delta 1), reused 0 (delta 0), pack-reused 0</span><br><span class="line">Unpacking objects: 100% (5/5), 435 bytes | 435.00 KiB/s, done.</span><br><span class="line">From http://ubuntu.alfdxl.top/gitea-admin/git-template</span><br><span class="line">   fbd7e0a..01df67e  feat_adminuser -&gt; origin/feat_adminuser</span><br><span class="line">Already up to date.</span><br><span class="line"><span class="meta prompt_">$ </span><span class="language-bash">git rebase</span></span><br><span class="line">Successfully rebased and updated refs/heads/feat_adminuser.</span><br></pre></td></tr></table></figure>
+<h3 id="push">push</h3>
+<p>推送本地记录到远程仓。</p>
+<p>推送提交记录：<code>git push [REPO] [BRANCH]</code></p>
+<p>推送标签记录：<code>git push --tags [REPO] [BRANCH]</code></p>
+<p>使用示例：</p>
+<figure class="highlight shell"><table><tr><td class="code"><pre><span class="line"><span class="meta prompt_"># </span><span class="language-bash">推送本地提交记录</span></span><br><span class="line"><span class="meta prompt_">$ </span><span class="language-bash">git push</span>                         </span><br><span class="line">Enumerating objects: 9, done.</span><br><span class="line">Counting objects: 100% (9/9), done.</span><br><span class="line">Delta compression using up to 8 threads</span><br><span class="line">Compressing objects: 100% (4/4), done.</span><br><span class="line">Writing objects: 100% (5/5), 453 bytes | 453.00 KiB/s, done.</span><br><span class="line">Total 5 (delta 1), reused 0 (delta 0), pack-reused 0</span><br><span class="line">remote: </span><br><span class="line">remote: Create a new pull request for &#x27;feat_adminuser&#x27;:</span><br><span class="line">remote:   http://ubuntu.alfdxl.top/gitea-admin/git-template/compare/master...feat_adminuser</span><br><span class="line">remote: </span><br><span class="line">remote: . Processing 1 references</span><br><span class="line">remote: Processed 1 references in total</span><br><span class="line">To ssh://ubuntu.alfdxl.top:222/gitea-admin/git-template.git</span><br><span class="line">   3110aa8..fbd7e0a  feat_adminuser -&gt; feat_adminuser</span><br><span class="line"><span class="meta prompt_"></span></span><br><span class="line"><span class="meta prompt_"># </span><span class="language-bash">推送标签记录</span></span><br><span class="line"><span class="meta prompt_">$ </span><span class="language-bash">git push --tags</span> </span><br><span class="line">Total 0 (delta 0), reused 0 (delta 0), pack-reused 0</span><br><span class="line">remote: .. Processing 2 references</span><br><span class="line">remote: Processed 2 references in total</span><br><span class="line">To http://ubuntu.alfdxl.top/gitea-admin/git-template.git</span><br><span class="line"> * [new tag]         v1.2.3 -&gt; v1.2.3</span><br><span class="line"> * [new tag]         v1.2.6 -&gt; v1.2.6</span><br></pre></td></tr></table></figure>
+<h2 id="section"></h2>
+<h2 id="配置">配置</h2>
+<p><a
+href="https://blog.csdn.net/weixin_46074961/article/details/126400431">参考文章</a></p>
+<p>配置用户名、邮箱</p>
+<figure class="highlight sh"><table><tr><td class="code"><pre><span class="line">git config --global user.name <span class="string">&quot;名字&quot;</span></span><br><span class="line">git config --global user.email <span class="string">&quot;邮箱&quot;</span></span><br></pre></td></tr></table></figure>
+<p>配置编辑器</p>
+<figure class="highlight sh"><table><tr><td class="code"><pre><span class="line">git config --global core.editor vim</span><br></pre></td></tr></table></figure>
+<p>配置日志显示格式</p>
+<figure class="highlight sh"><table><tr><td class="code"><pre><span class="line"><span class="comment"># 隐藏Merge --no-merges</span></span><br><span class="line"><span class="comment"># 过滤作者 --author=&#x27;你的名字！自己修改！&#x27;</span></span><br><span class="line"></span><br><span class="line">git config --global alias.lm <span class="string">&quot;log --no-merges --color --date=format:&#x27;%Y-%m-%d %H:%M:%S&#x27; --pretty=format:&#x27;%Cred%h%Creset -%C(yellow)%d%Cblue %s %Cgreen(%cd) %C(bold blue)&lt;%an&gt;%Creset&#x27; --abbrev-commit&quot;</span></span><br><span class="line"><span class="comment"># 显示效果</span></span><br><span class="line"></span><br><span class="line">git config --global alias.lms  <span class="string">&quot;log --no-merges --color --stat --date=format:&#x27;%Y-%m-%d %H:%M:%S&#x27; --pretty=format:&#x27;%Cred%h%Creset -%C(yellow)%d%Cblue %s %Cgreen(%cd) %C(bold blue)&lt;%an&gt;%Creset&#x27; --abbrev-commit&quot;</span></span><br><span class="line"></span><br><span class="line">git config --global alias.ls <span class="string">&quot;log --no-merges --color --graph --date=format:&#x27;%Y-%m-%d %H:%M:%S&#x27; --pretty=format:&#x27;%Cred%h%Creset -%C(yellow)%d%Cblue %s %Cgreen(%cd) %C(bold blue)&lt;%an&gt;%Creset&#x27; --abbrev-commit&quot;</span></span><br><span class="line"></span><br><span class="line">git config --global alias.lss <span class="string">&quot;log --no-merges --color --stat --graph --date=format:&#x27;%Y-%m-%d %H:%M:%S&#x27; --pretty=format:&#x27;%Cred%h%Creset -%C(yellow)%d%Cblue %s %Cgreen(%cd) %C(bold blue)&lt;%an&gt;%Creset&#x27; --abbrev-commit&quot;</span></span><br><span class="line"></span><br><span class="line">git lm -n 5 | <span class="built_in">cat</span></span><br></pre></td></tr></table></figure>
+<p><code>git lm</code>显示效果：</p>
+<figure>
+<img src="Git使用.assets/image-20230323104635608.png"
+alt="image-20230323104635608" />
+<figcaption aria-hidden="true">image-20230323104635608</figcaption>
+</figure>
+<p><code>git lms</code>显示效果：</p>
+<figure>
+<img src="Git使用.assets/image-20230323104836558.png"
+alt="image-20230323104836558" />
+<figcaption aria-hidden="true">image-20230323104836558</figcaption>
+</figure>
+<p><code>git ls</code>显示效果：</p>
+<figure>
+<img src="Git使用.assets/image-20230323104951086.png"
+alt="image-20230323104951086" />
+<figcaption aria-hidden="true">image-20230323104951086</figcaption>
+</figure>
+<p><code>git lss</code>显示效果：</p>
+<figure>
+<img src="Git使用.assets/image-20230323105025239.png"
+alt="image-20230323105025239" />
+<figcaption aria-hidden="true">image-20230323105025239</figcaption>
+</figure>
+]]></content>
+  </entry>
+  <entry>
+    <title>Ubuntu20使用</title>
+    <url>/2023/09/28/Ubuntu20%E4%BD%BF%E7%94%A8/</url>
+    <content><![CDATA[<h1 id="网络配置">网络配置</h1>
+<p>网络配置改用netplan，配置方式与以前版本不同。参考<a
+href="https://netplan.io/examples">Canonical Netplan</a></p>
+<p>其中<code>enp0s3</code>使用的是主机网络（用于主机中局域网络访问），<code>enp0s8</code>使用的是VirtualBox自带的NAT网络（用于访问互联网）。修改配置文件/etc/netplan/00-installer-config.yaml
+<figure class="highlight yaml"><table><tr><td class="code"><pre><span class="line"><span class="comment"># This is the network config written by &#x27;subiquity&#x27;</span></span><br><span class="line"><span class="attr">network:</span></span><br><span class="line">  <span class="attr">renderer:</span> <span class="string">networkd</span> <span class="comment"># NetworkManager</span></span><br><span class="line">  <span class="attr">ethernets:</span></span><br><span class="line">    <span class="attr">enp0s3:</span></span><br><span class="line">      <span class="attr">dhcp4:</span> <span class="literal">no</span></span><br><span class="line">      <span class="attr">dhcp6:</span> <span class="literal">no</span></span><br><span class="line">      <span class="attr">addresses:</span> [<span class="number">192.168</span><span class="number">.56</span><span class="number">.101</span><span class="string">/24</span>]</span><br><span class="line">      <span class="comment"># gateway4: 192.168.56.1</span></span><br><span class="line">      <span class="comment"># optional: true</span></span><br><span class="line">      <span class="comment"># nameservers:</span></span><br><span class="line">      <span class="comment">#   addresses: [192.168.56.1,8.8.8.8]</span></span><br><span class="line">      <span class="comment"># routes:</span></span><br><span class="line">      <span class="comment">#   - to: default</span></span><br><span class="line">      <span class="comment">#   via: 192.168.56.1</span></span><br><span class="line">      <span class="comment"># routes:</span></span><br><span class="line">      <span class="comment">#   - to: 192.168.56.0/24</span></span><br><span class="line">      <span class="comment">#     via: 192.168.56.1</span></span><br><span class="line">      <span class="comment">#     table: 102</span></span><br><span class="line">      <span class="comment"># routing-policy:</span></span><br><span class="line">      <span class="comment">#   - from: 192.168.56.0/24</span></span><br><span class="line">      <span class="comment">#     table: 102</span></span><br><span class="line">    <span class="attr">enp0s8:</span></span><br><span class="line">      <span class="attr">dhcp4:</span> <span class="literal">yes</span></span><br><span class="line">      <span class="attr">dhcp6:</span> <span class="literal">no</span></span><br><span class="line">      <span class="comment"># nameservers:</span></span><br><span class="line">        <span class="comment"># addresses: [10.0.3.1,8.8.8.8]</span></span><br><span class="line">  <span class="attr">version:</span> <span class="number">2</span></span><br></pre></td></tr></table></figure></p>
+]]></content>
+      <categories>
+        <category>Linux</category>
+      </categories>
   </entry>
   <entry>
     <title>从零实现Ada编译器-参考资料</title>
