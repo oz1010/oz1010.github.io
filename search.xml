@@ -1,6 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
 <search>
   <entry>
+    <title>Linux驱动-USB协议栈简介</title>
+    <url>/2025/09/01/Linux%E9%A9%B1%E5%8A%A8-USB%E5%8D%8F%E8%AE%AE%E6%A0%88%E7%AE%80%E4%BB%8B/</url>
+    <content><![CDATA[<blockquote>
+<p>英文原文：<a
+href="https://www.kernel.org/doc/html/v6.1/driver-api/usb/index.html">Linux
+USB API</a></p>
+</blockquote>
+]]></content>
+      <categories>
+        <category>Linux</category>
+        <category>Driver</category>
+        <category>USB</category>
+      </categories>
+  </entry>
+  <entry>
     <title>Linux驱动-存储协议栈简介</title>
     <url>/2025/09/01/Linux%E9%A9%B1%E5%8A%A8-%E5%AD%98%E5%82%A8%E5%8D%8F%E8%AE%AE%E6%A0%88%E7%AE%80%E4%BB%8B/</url>
     <content><![CDATA[<p><a href="https://www.thomas-krenn.com/en/wiki/Category:Linux">wiki -
@@ -15,7 +30,7 @@ alt="Linux Storage Stack Diagram (Linux Kernel 6.16)" />
 ]]></content>
       <categories>
         <category>Linux</category>
-        <category>驱动</category>
+        <category>Driver</category>
       </categories>
   </entry>
   <entry>
@@ -2339,7 +2354,7 @@ href="http://wiki.100ask.org/Qemu">百问网嵌入式Linux</a></p>
 ]]></content>
       <categories>
         <category>Linux</category>
-        <category>驱动</category>
+        <category>Driver</category>
       </categories>
   </entry>
   <entry>
@@ -2632,7 +2647,7 @@ href="https://blog.csdn.net/cotex_a9/category_12427627.html">嵌入式王道长-
 ]]></content>
       <categories>
         <category>Linux</category>
-        <category>驱动</category>
+        <category>Driver</category>
       </categories>
   </entry>
   <entry>
