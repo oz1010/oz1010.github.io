@@ -1,6 +1,24 @@
 <?xml version="1.0" encoding="utf-8"?>
 <search>
   <entry>
+    <title>Linux驱动-存储协议栈简介</title>
+    <url>/2025/09/01/Linux%E9%A9%B1%E5%8A%A8-%E5%AD%98%E5%82%A8%E5%8D%8F%E8%AE%AE%E6%A0%88%E7%AE%80%E4%BB%8B/</url>
+    <content><![CDATA[<p><a href="https://www.thomas-krenn.com/en/wiki/Category:Linux">wiki -
+Server Software</a></p>
+<figure>
+<img
+src="https://www.thomas-krenn.com/en/wikiEN/images/8/88/Linux-storage-stack-diagram_v6.16.png"
+alt="Linux Storage Stack Diagram (Linux Kernel 6.16)" />
+<figcaption aria-hidden="true">Linux Storage Stack Diagram (Linux Kernel
+6.16)</figcaption>
+</figure>
+]]></content>
+      <categories>
+        <category>Linux</category>
+        <category>驱动</category>
+      </categories>
+  </entry>
+  <entry>
     <title>V2Ray新脚本安装服务器-适合新手小白</title>
     <url>/2025/08/28/V2Ray%E6%96%B0%E8%84%9A%E6%9C%AC%E5%AE%89%E8%A3%85%E6%9C%8D%E5%8A%A1%E5%99%A8-%E9%80%82%E5%90%88%E6%96%B0%E6%89%8B%E5%B0%8F%E7%99%BD/</url>
     <content><![CDATA[<p><strong>先插播广告</strong></p>
