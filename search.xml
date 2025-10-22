@@ -8,25 +8,155 @@
 USB API</a></p>
 </blockquote>
 <h1 id="协议层">协议层</h1>
-<blockquote>
-<p>参考：<a href="https://ldd.100ask.net/zh/12_USB/04_1.html">04_USB协议层数据格式 —
-Linux设备驱动开发教程中心</a></p>
-</blockquote>
-<h2 id="基础">基础</h2>
-<h3 id="包格式">包格式</h3>
+<h2 id="包格式">包格式</h2>
 <p>USB协议层都是以包为基本单元，采用LSB（先发送低位）字节序。</p>
-<p>Host发出SOP信号后，就会发出SYNC信号：它是一系列的、最大传输频率的脉冲，接收方使用它来同步数据。对于低速/全速设备，SYNC信号是8位数据(从做到右是00000001)；对于高速设备，SYNC信号是32位数据(从左到右是00000000000000000000000000000001)。使用NRZI编码时，前面每个”0”都对应一个跳变。具体包格式见下图：</p>
+<p>Host发出SOP信号后，就会发出SYNC信号：它是一系列的、最大传输频率的脉冲，接收方使用它来同步数据。对于低速/全速设备，SYNC信号是8位数据(从做到右是00000001)；对于高速设备，SYNC信号是32位数据(从左到右是00000000000000000000000000000001)。使用NRZI编码时，前面每个”0”都对应一个跳变。具体包格式见下图（来自百问网）：</p>
 <figure>
-<img src="/2025/09/01/Linux%E9%A9%B1%E5%8A%A8-USB%E5%8D%8F%E8%AE%AE%E6%A0%88%E7%AE%80%E4%BB%8B/23_usb_packet.png" alt="USB包格式">
-<figcaption aria-hidden="true">USB包格式</figcaption>
+<img src="https://ldd.100ask.net/_images/23_usb_packet.png" alt="img">
+<figcaption aria-hidden="true">img</figcaption>
 </figure>
 <p>USB包各部分介绍：</p>
 <ul>
 <li><code>SOP</code> 用来表示包起始</li>
 <li><code>SYNC</code> 用来同步时钟</li>
-<li><code>PID</code></li>
-<li><code>地址</code></li>
-<li><code>帧号</code></li>
+<li><code>Packet</code> 实际有效的包数据</li>
+<li><code>EOP</code> 用来表示包结束</li>
+</ul>
+<p>包（Packet）的具体结构：</p>
+<ul>
+<li><code>PID</code> 包类型</li>
+<li><code>地址</code>
+USB设备的逻辑地址，Host发出的包中一般都需要包含目标设备的地址</li>
+<li><code>帧号</code>和<code>数据</code>
+需要由包类型确定，具体需要查看协议文档</li>
+<li><code>CRC</code> 校验码</li>
+</ul>
+<h3 id="包类型pid">包类型（PID）</h3>
+<p>USB中数据方向都是基于Host角度来看的，<code>out</code>表示从Host发送数据到设备，<code>in</code>表示从设备发送数据到Host。由于设备都是被动响应的，因此完整的传输，都是由Host发起第一个包。</p>
+<p>包数据里的PID按照<code>bit1-0</code>可以分为四大类：</p>
+<ul>
+<li>令牌包(Token)：01B</li>
+<li>数据包(Data)：11B</li>
+<li>握手包(Handshake)：10B</li>
+<li>特殊包(Special)：00B</li>
+</ul>
+<p>PID低4位可以确定包类型，如下表所示：</p>
+<figure>
+<img src="/2025/09/01/Linux%E9%A9%B1%E5%8A%A8-USB%E5%8D%8F%E8%AE%AE%E6%A0%88%E7%AE%80%E4%BB%8B/26_pid.png" alt="image-20220819095112885">
+<figcaption aria-hidden="true">image-20220819095112885</figcaption>
+</figure>
+<p>PID决定了后续数据类型，为了降低出错的概率，额外增加4位用于取反校验。实际包中的PID由8位来表示，格式如下：</p>
+<figure>
+<img src="/2025/09/01/Linux%E9%A9%B1%E5%8A%A8-USB%E5%8D%8F%E8%AE%AE%E6%A0%88%E7%AE%80%E4%BB%8B/27_pid_field.png" alt="image-20220819100829291">
+<figcaption aria-hidden="true">image-20220819100829291</figcaption>
+</figure>
+<h3 id="令牌包token">令牌包（Token）</h3>
+<p>令牌类的包作用是通知设备。</p>
+<p>SOF（Start-of-Frame）令牌包是由主机固定频率发送的包。对于FS（full-speed）速率总线是间隔1.00
+ms ±0.0005 ms，对于HS（high-speed）速率总线是间隔125 µs ±0.0625
+µs。作用是通知所有设备，SOF令牌包格式如下：</p>
+<figure>
+<img src="/2025/09/01/Linux%E9%A9%B1%E5%8A%A8-USB%E5%8D%8F%E8%AE%AE%E6%A0%88%E7%AE%80%E4%BB%8B/28_sof_packet.png" alt="image-20251014095756916">
+<figcaption aria-hidden="true">image-20251014095756916</figcaption>
+</figure>
+<p>IN/OUT/SETUP令牌包通知特定设备，格式如下：</p>
+<figure>
+<img src="/2025/09/01/Linux%E9%A9%B1%E5%8A%A8-USB%E5%8D%8F%E8%AE%AE%E6%A0%88%E7%AE%80%E4%BB%8B/28_token_format.png" alt="image-20251014094921786">
+<figcaption aria-hidden="true">image-20251014094921786</figcaption>
+</figure>
+<h3 id="数据包data">数据包（Data）</h3>
+<p>数据包包含PID域、0或多字节数据域和一个CRC域，如下图所示。有四种类型的数据包：DATA0、DATA1、DATA2、MDATA。</p>
+<figure>
+<img src="/2025/09/01/Linux%E9%A9%B1%E5%8A%A8-USB%E5%8D%8F%E8%AE%AE%E6%A0%88%E7%AE%80%E4%BB%8B/29_data_packet_format.png" alt="image-20251014101326036">
+<figcaption aria-hidden="true">image-20251014101326036</figcaption>
+</figure>
+<h3 id="握手包handshake">握手包（Handshake）</h3>
+<p>握手包只包含PID域。握手包用于汇报数据传输的状态，返回一个值表示数据成功接收、命令接收或拒绝、流控制、halt状态。</p>
+<p>有四种类型的握手包和一种特殊的握手包：</p>
+<ul>
+<li>ACK，表明数据包成功接收或数据域没有CRC错误且PID域正确。</li>
+<li>NAK，表明设备不能从host接收数据（OUT）或向host发送数据（IN）。</li>
+<li>STALL，设备返回的响应，可以是对IN令牌包的响应、OUT的数据阶段的响应、PING传输的响应。</li>
+<li>NYET，仅适用于HS设备。可以用于响应PING协议，或用于响应split传输时FS/HS设备未完成。</li>
+<li>ERR，仅适用于HS设备。允许HS HUB报告总线上的错误。</li>
+</ul>
+<h2 id="数据翻转同步和重试">数据翻转同步和重试</h2>
+<p>USB提供一种确保在数据收发者间数据序列同步的机制，通过使用DATA0和DATA1包和数据收发者的序列位翻转来实现。</p>
+<p>初始化</p>
+<p>控制传输使用SETUP令牌包初始化host和设备序列位，如下图所示：</p>
+<figure>
+<img src="/2025/09/01/Linux%E9%A9%B1%E5%8A%A8-USB%E5%8D%8F%E8%AE%AE%E6%A0%88%E7%AE%80%E4%BB%8B/image-20251014191445444.png" alt="image-20251014191445444">
+<figcaption aria-hidden="true">image-20251014191445444</figcaption>
+</figure>
+<h3 id="成功的数据传输">成功的数据传输</h3>
+<p>在每次传输中，接收者需要比较发送者的序列位（数据包PID域编码是DATA0或DATA1）是否与接收者序列位一致。若数据可接收并且收发序列位一致，序列位需要翻转。</p>
+<figure>
+<img src="/2025/09/01/Linux%E9%A9%B1%E5%8A%A8-USB%E5%8D%8F%E8%AE%AE%E6%A0%88%E7%AE%80%E4%BB%8B/image-20251014191858456.png" alt="image-20251014191858456">
+<figcaption aria-hidden="true">image-20251014191858456</figcaption>
+</figure>
+<h3 id="数据损坏或不可接收">数据损坏或不可接收</h3>
+<p>若不能接收数据或数据已经损坏，接受者会发送NAK或STALL握手包，并且不会翻转它的序列位。</p>
+<figure>
+<img src="/2025/09/01/Linux%E9%A9%B1%E5%8A%A8-USB%E5%8D%8F%E8%AE%AE%E6%A0%88%E7%AE%80%E4%BB%8B/image-20251014192428739.png" alt="image-20251014192428739">
+<figcaption aria-hidden="true">image-20251014192428739</figcaption>
+</figure>
+<h3 id="损坏的ack握手包">损坏的ACK握手包</h3>
+<p>当发送者没有收到正确的ACK，不会翻转序列位。当超时后会重试发送相同数据，直到接收到正确的ACK。</p>
+<figure>
+<img src="/2025/09/01/Linux%E9%A9%B1%E5%8A%A8-USB%E5%8D%8F%E8%AE%AE%E6%A0%88%E7%AE%80%E4%BB%8B/image-20251014192458575.png" alt="image-20251014192458575">
+<figcaption aria-hidden="true">image-20251014192458575</figcaption>
+</figure>
+<h2 id="事务transaction与传输transfer">事务（Transaction）与传输（Transfer）</h2>
+<p>USB传输最基本的单元是包（Packet），包类型是PID域表示。单一的包无法完成完整数据的传输。一个完整数据传输往往需要包含到多个包：令牌包、数据包、握手包，而这个过程被称为事务（Transaction）。单个或多个事务组合起来就是一个传输（Transfer）。</p>
+<p>不同事务类型包含包的数量不完全相同，它取决于端点（endpoint）类型。这里有四种端点类型：批量（bulk）、控制（control）、中断（interrupt）和实时（isochronous）。</p>
+<p>如下就是一个完整的<code>BOT SCSI CMD</code>传输，总共包含三个批量事务：<code>CBW</code>事务、<code>SCSI DATA</code>事务和<code>CSW</code>事务。而每个事务都是一个批量事务类型，都是一个三阶段的事务。</p>
+<figure>
+<img src="/2025/09/01/Linux%E9%A9%B1%E5%8A%A8-USB%E5%8D%8F%E8%AE%AE%E6%A0%88%E7%AE%80%E4%BB%8B/image-20251017111355123.png" alt="image-20251017111355123">
+<figcaption aria-hidden="true">image-20251017111355123</figcaption>
+</figure>
+<h3 id="批量事务bulk">批量事务（Bulk）</h3>
+<p>批量事务类型的特点是能够通过错误检测和重试，在主机与功能之间保证数据无错误的传输。它使用三阶段的事务包括：令牌包、数据包、握手包。</p>
+<figure>
+<img src="/2025/09/01/Linux%E9%A9%B1%E5%8A%A8-USB%E5%8D%8F%E8%AE%AE%E6%A0%88%E7%AE%80%E4%BB%8B/image-20251014195341690.png" alt="image-20251014195341690">
+<figcaption aria-hidden="true">image-20251014195341690</figcaption>
+</figure>
+<p>常见支持批量事务的设备有：USB存储设备。</p>
+<h3 id="控制传输control">控制传输（Control）</h3>
+<p>控制传输至少有两个事务阶段：设置（Setup）和状态（Status）。控制传输可选择在设置阶段和状态阶段之间包含一个数据（Data）阶段。在设置阶段，使用
+SETUP 事务将信息传送到功能的控制端点。SETUP 事务的格式类似于
+OUT，但使用的是 SETUP PID 而不是 OUT PID。</p>
+<p>下图是一个SETUP事务包含三个包：SETUP包、DATA0包、ACK包。</p>
+<figure>
+<img src="/2025/09/01/Linux%E9%A9%B1%E5%8A%A8-USB%E5%8D%8F%E8%AE%AE%E6%A0%88%E7%AE%80%E4%BB%8B/image-20251014195855230.png" alt="image-20251014195855230">
+<figcaption aria-hidden="true">image-20251014195855230</figcaption>
+</figure>
+<p>若存在，控制传输会包含数据阶段，由一个或多个IN或OUT事务组成，遵循与批量事务相同的协议规则。所有在数据阶段的传输事务保持相同的方向（例如全IN事务或全OUT事务）。一个SETUP总是使用DATA0的PID作为SETUP事务的数据域。</p>
+<p>控制传输的状态阶段是序列上的最后一个事务。状态阶段事物遵循与批量事务相同的协议序列。例如，当数据阶段包含全OUT事务，状态就是一个IN事务。若控制序列没有数据阶段，则状态就是一个IN事务。</p>
+<figure>
+<img src="/2025/09/01/Linux%E9%A9%B1%E5%8A%A8-USB%E5%8D%8F%E8%AE%AE%E6%A0%88%E7%AE%80%E4%BB%8B/image-20251014195928566.png" alt="image-20251014195928566">
+<figcaption aria-hidden="true">image-20251014195928566</figcaption>
+</figure>
+<p>所有的USB设备必须支持的传输类型。</p>
+<h3 id="中断事务interrupt">中断事务（Interrupt）</h3>
+<p>中断事务使用三阶段的事务包括：令牌包、数据包、握手包。</p>
+<figure>
+<img src="/2025/09/01/Linux%E9%A9%B1%E5%8A%A8-USB%E5%8D%8F%E8%AE%AE%E6%A0%88%E7%AE%80%E4%BB%8B/image-20251017113514694.png" alt="image-20251017113514694">
+<figcaption aria-hidden="true">image-20251017113514694</figcaption>
+</figure>
+<p>中断事务跟批量事务非常类似，不同的是Host会周期性地发送事务进行数据读写。常见支持中断事务的设备有：USB鼠标、USB键盘等。</p>
+<h3 id="实时事务isochronous">实时事务（Isochronous）</h3>
+<p>实时事务包含一个令牌和一个数据阶段，但没有握手阶段。实时事务不支持握手阶段或重试能力。</p>
+<figure>
+<img src="/2025/09/01/Linux%E9%A9%B1%E5%8A%A8-USB%E5%8D%8F%E8%AE%AE%E6%A0%88%E7%AE%80%E4%BB%8B/image-20251022144041260.png" alt="image-20251022144041260">
+<figcaption aria-hidden="true">image-20251022144041260</figcaption>
+</figure>
+<p>实时事务需要Host周期性的发起，相比中断事务，不要求准确性，传输的数据量比较大。常见支持实时事务的设备有USB摄像头。</p>
+<h1 id="附录">附录</h1>
+<h2 id="参考文档">参考文档</h2>
+<ul>
+<li>百问网文档：<a href="https://ldd.100ask.net/zh/12_USB/04_1.html">04_USB协议层数据格式 —
+Linux设备驱动开发教程中心</a></li>
+<li>《Universal Serial Bus Specification V2.0》</li>
 </ul>
 ]]></content>
       <categories>
