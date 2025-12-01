@@ -4,17 +4,19 @@
     <title>计算机基础-ASCII码总表</title>
     <url>/2025/12/01/%E8%AE%A1%E7%AE%97%E6%9C%BA%E5%9F%BA%E7%A1%80-ASCII%E7%A0%81%E6%80%BB%E8%A1%A8/</url>
     <content><![CDATA[<h1 id="ascii码表">ASCII码表</h1>
-<h2 id="控制字符">控制字符</h2>
+<h2 id="控制字符0x00-0x1f">控制字符（0x00 ~ 0x1F）</h2>
 <table>
 <colgroup>
 <col style="width: 6%">
 <col style="width: 6%">
-<col style="width: 39%">
-<col style="width: 48%">
+<col style="width: 6%">
+<col style="width: 43%">
+<col style="width: 36%">
 </colgroup>
 <thead>
 <tr class="header">
 <th>Hex</th>
+<th>Dec</th>
 <th>缩写</th>
 <th>英文全称</th>
 <th>典型作用 / 说明</th>
@@ -23,201 +25,1012 @@
 <tbody>
 <tr class="odd">
 <td>0x00</td>
+<td>0</td>
 <td>NUL</td>
 <td>Null</td>
-<td>字符串结束、占位、填充</td>
+<td>空字符 / 字符串结束</td>
 </tr>
 <tr class="even">
 <td>0x01</td>
+<td>1</td>
 <td>SOH</td>
 <td>Start of Heading</td>
-<td>数据块开始（早期通信）</td>
+<td>标题开始</td>
 </tr>
 <tr class="odd">
 <td>0x02</td>
+<td>2</td>
 <td>STX</td>
 <td>Start of Text</td>
 <td>正文开始</td>
 </tr>
 <tr class="even">
 <td>0x03</td>
+<td>3</td>
 <td>ETX</td>
 <td>End of Text</td>
-<td>正文结束，<strong>Ctrl+C</strong></td>
+<td>文本结束 / <strong>Ctrl+C</strong></td>
 </tr>
 <tr class="odd">
 <td>0x04</td>
+<td>4</td>
 <td>EOT</td>
 <td>End of Transmission</td>
-<td>传输结束，<strong>Ctrl+D</strong></td>
+<td>传输结束 / <strong>Ctrl+D</strong></td>
 </tr>
 <tr class="even">
 <td>0x05</td>
+<td>5</td>
 <td>ENQ</td>
 <td>Enquiry</td>
-<td>请求响应</td>
+<td>查询</td>
 </tr>
 <tr class="odd">
 <td>0x06</td>
+<td>6</td>
 <td>ACK</td>
 <td>Acknowledge</td>
 <td>确认应答</td>
 </tr>
 <tr class="even">
 <td>0x07</td>
+<td>7</td>
 <td>BEL</td>
 <td>Bell</td>
-<td>响铃（终端蜂鸣）</td>
+<td>蜂鸣</td>
 </tr>
 <tr class="odd">
 <td>0x08</td>
+<td>8</td>
 <td>BS</td>
 <td>Backspace</td>
 <td>退格</td>
 </tr>
 <tr class="even">
 <td>0x09</td>
+<td>9</td>
 <td>HT</td>
 <td>Horizontal Tab</td>
-<td>水平制表符（Tab）</td>
+<td>制表符</td>
 </tr>
 <tr class="odd">
 <td>0x0A</td>
+<td>10</td>
 <td>LF</td>
 <td>Line Feed</td>
-<td>换行（Unix 换行）</td>
+<td>换行（）</td>
 </tr>
 <tr class="even">
 <td>0x0B</td>
+<td>11</td>
 <td>VT</td>
 <td>Vertical Tab</td>
 <td>垂直制表</td>
 </tr>
 <tr class="odd">
 <td>0x0C</td>
+<td>12</td>
 <td>FF</td>
 <td>Form Feed</td>
 <td>换页</td>
 </tr>
 <tr class="even">
 <td>0x0D</td>
+<td>13</td>
 <td>CR</td>
 <td>Carriage Return</td>
-<td>回车（<code>\\r</code>）</td>
+<td>回车（</td>
 </tr>
 <tr class="odd">
 <td>0x0E</td>
+<td>14</td>
 <td>SO</td>
 <td>Shift Out</td>
 <td>切换字符集</td>
 </tr>
 <tr class="even">
 <td>0x0F</td>
+<td>15</td>
 <td>SI</td>
 <td>Shift In</td>
 <td>恢复字符集</td>
 </tr>
 <tr class="odd">
 <td>0x10</td>
+<td>16</td>
 <td>DLE</td>
 <td>Data Link Escape</td>
 <td>数据链路转义</td>
 </tr>
 <tr class="even">
 <td>0x11</td>
+<td>17</td>
 <td>DC1</td>
 <td>Device Control 1</td>
-<td>XON（软件流控）</td>
+<td>XON</td>
 </tr>
 <tr class="odd">
 <td>0x12</td>
+<td>18</td>
 <td>DC2</td>
 <td>Device Control 2</td>
 <td>设备控制</td>
 </tr>
 <tr class="even">
 <td>0x13</td>
+<td>19</td>
 <td>DC3</td>
 <td>Device Control 3</td>
-<td>XOFF（软件流控）</td>
+<td>XOFF</td>
 </tr>
 <tr class="odd">
 <td>0x14</td>
+<td>20</td>
 <td>DC4</td>
 <td>Device Control 4</td>
 <td>设备控制</td>
 </tr>
 <tr class="even">
 <td>0x15</td>
+<td>21</td>
 <td>NAK</td>
 <td>Negative Acknowledge</td>
 <td>否认应答</td>
 </tr>
 <tr class="odd">
 <td>0x16</td>
+<td>22</td>
 <td>SYN</td>
 <td>Synchronous Idle</td>
 <td>同步空闲</td>
 </tr>
 <tr class="even">
 <td>0x17</td>
+<td>23</td>
 <td>ETB</td>
 <td>End of Transmission Block</td>
-<td>传输块结束</td>
+<td>块结束</td>
 </tr>
 <tr class="odd">
 <td>0x18</td>
+<td>24</td>
 <td>CAN</td>
 <td>Cancel</td>
-<td>取消操作 / 传输</td>
+<td>取消操作</td>
 </tr>
 <tr class="even">
 <td>0x19</td>
+<td>25</td>
 <td>EM</td>
 <td>End of Medium</td>
 <td>介质结束</td>
 </tr>
 <tr class="odd">
 <td>0x1A</td>
+<td>26</td>
 <td>SUB</td>
 <td>Substitute</td>
-<td>EOF（Windows 文本），<strong>Ctrl+Z</strong></td>
+<td>EOF / <strong>Ctrl+Z</strong></td>
 </tr>
 <tr class="even">
 <td>0x1B</td>
+<td>27</td>
 <td>ESC</td>
 <td>Escape</td>
-<td>转义字符（ANSI 控制序列）</td>
+<td>转义（ANSI）</td>
 </tr>
 <tr class="odd">
 <td>0x1C</td>
+<td>28</td>
 <td>FS</td>
 <td>File Separator</td>
-<td>文件分隔符</td>
+<td>文件分隔</td>
 </tr>
 <tr class="even">
 <td>0x1D</td>
+<td>29</td>
 <td>GS</td>
 <td>Group Separator</td>
-<td>组分隔符</td>
+<td>组分隔</td>
 </tr>
 <tr class="odd">
 <td>0x1E</td>
+<td>30</td>
 <td>RS</td>
 <td>Record Separator</td>
-<td>记录分隔符</td>
+<td>记录分隔</td>
 </tr>
 <tr class="even">
 <td>0x1F</td>
+<td>31</td>
 <td>US</td>
 <td>Unit Separator</td>
-<td>单元分隔符</td>
+<td>单元分隔</td>
+</tr>
+</tbody>
+</table>
+<h2 id="可打印字符0x200x7e">可打印字符（0x20~0x7E）</h2>
+<h3 id="标点表10x200x2f">标点表1（0x20~0x2F）</h3>
+<table>
+<thead>
+<tr class="header">
+<th>Hex</th>
+<th>Dec</th>
+<th>缩写</th>
+<th>英文全称</th>
+<th>典型作用 / 说明</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>0x20</td>
+<td>32</td>
+<td>SP</td>
+<td>Space</td>
+<td>空格</td>
+</tr>
+<tr class="even">
+<td>0x21</td>
+<td>33</td>
+<td>!</td>
+<td>Exclamation Mark</td>
+<td>感叹号</td>
 </tr>
 <tr class="odd">
+<td>0x22</td>
+<td>34</td>
+<td>”</td>
+<td>Quotation Mark</td>
+<td>双引号</td>
+</tr>
+<tr class="even">
+<td>0x23</td>
+<td>35</td>
+<td>#</td>
+<td>Number Sign</td>
+<td>井号</td>
+</tr>
+<tr class="odd">
+<td>0x24</td>
+<td>36</td>
+<td>$</td>
+<td>Dollar Sign</td>
+<td>美元符</td>
+</tr>
+<tr class="even">
+<td>0x25</td>
+<td>37</td>
+<td>%</td>
+<td>Percent Sign</td>
+<td>百分号</td>
+</tr>
+<tr class="odd">
+<td>0x26</td>
+<td>38</td>
+<td>&amp;</td>
+<td>Ampersand</td>
+<td>与</td>
+</tr>
+<tr class="even">
+<td>0x27</td>
+<td>39</td>
+<td>’</td>
+<td>Apostrophe</td>
+<td>单引号</td>
+</tr>
+<tr class="odd">
+<td>0x28</td>
+<td>40</td>
+<td>(</td>
+<td>Left Parenthesis</td>
+<td>左括号</td>
+</tr>
+<tr class="even">
+<td>0x29</td>
+<td>41</td>
+<td>)</td>
+<td>Right Parenthesis</td>
+<td>右括号</td>
+</tr>
+<tr class="odd">
+<td>0x2A</td>
+<td>42</td>
+<td>*</td>
+<td>Asterisk</td>
+<td>星号</td>
+</tr>
+<tr class="even">
+<td>0x2B</td>
+<td>43</td>
+<td>+</td>
+<td>Plus Sign</td>
+<td>加号</td>
+</tr>
+<tr class="odd">
+<td>0x2C</td>
+<td>44</td>
+<td>,</td>
+<td>Comma</td>
+<td>逗号</td>
+</tr>
+<tr class="even">
+<td>0x2D</td>
+<td>45</td>
+<td>-</td>
+<td>Hyphen-Minus</td>
+<td>连字符</td>
+</tr>
+<tr class="odd">
+<td>0x2E</td>
+<td>46</td>
+<td>.</td>
+<td>Full Stop</td>
+<td>句点</td>
+</tr>
+<tr class="even">
+<td>0x2F</td>
+<td>47</td>
+<td>/</td>
+<td>Solidus</td>
+<td>斜杠</td>
+</tr>
+</tbody>
+</table>
+<h3 id="数字0x30-0x39">数字（0x30 ~ 0x39）</h3>
+<table>
+<thead>
+<tr class="header">
+<th>Hex</th>
+<th>Dec</th>
+<th>缩写</th>
+<th>英文全称</th>
+<th>典型作用 / 说明</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>0x30</td>
+<td>48</td>
+<td>0</td>
+<td>Digit Zero</td>
+<td>数字 0</td>
+</tr>
+<tr class="even">
+<td>0x31</td>
+<td>49</td>
+<td>1</td>
+<td>Digit One</td>
+<td>数字 1</td>
+</tr>
+<tr class="odd">
+<td>0x32</td>
+<td>50</td>
+<td>2</td>
+<td>Digit Two</td>
+<td>数字 2</td>
+</tr>
+<tr class="even">
+<td>0x33</td>
+<td>51</td>
+<td>3</td>
+<td>Digit Three</td>
+<td>数字 3</td>
+</tr>
+<tr class="odd">
+<td>0x34</td>
+<td>52</td>
+<td>4</td>
+<td>Digit Four</td>
+<td>数字 4</td>
+</tr>
+<tr class="even">
+<td>0x35</td>
+<td>53</td>
+<td>5</td>
+<td>Digit Five</td>
+<td>数字 5</td>
+</tr>
+<tr class="odd">
+<td>0x36</td>
+<td>54</td>
+<td>6</td>
+<td>Digit Six</td>
+<td>数字 6</td>
+</tr>
+<tr class="even">
+<td>0x37</td>
+<td>55</td>
+<td>7</td>
+<td>Digit Seven</td>
+<td>数字 7</td>
+</tr>
+<tr class="odd">
+<td>0x38</td>
+<td>56</td>
+<td>8</td>
+<td>Digit Eight</td>
+<td>数字 8</td>
+</tr>
+<tr class="even">
+<td>0x39</td>
+<td>57</td>
+<td>9</td>
+<td>Digit Nine</td>
+<td>数字 9</td>
+</tr>
+</tbody>
+</table>
+<h3 id="标点表20x3a-0x40">标点表2（0x3A ~ 0x40）</h3>
+<table>
+<thead>
+<tr class="header">
+<th>Hex</th>
+<th>Dec</th>
+<th>缩写</th>
+<th>英文全称</th>
+<th>典型作用 / 说明</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>0x3A</td>
+<td>58</td>
+<td>:</td>
+<td>Colon</td>
+<td>冒号</td>
+</tr>
+<tr class="even">
+<td>0x3B</td>
+<td>59</td>
+<td>;</td>
+<td>Semicolon</td>
+<td>分号</td>
+</tr>
+<tr class="odd">
+<td>0x3C</td>
+<td>60</td>
+<td>&lt;</td>
+<td>Less-Than Sign</td>
+<td>小于</td>
+</tr>
+<tr class="even">
+<td>0x3D</td>
+<td>61</td>
+<td>=</td>
+<td>Equals Sign</td>
+<td>等号</td>
+</tr>
+<tr class="odd">
+<td>0x3E</td>
+<td>62</td>
+<td>&gt;</td>
+<td>Greater-Than Sign</td>
+<td>大于</td>
+</tr>
+<tr class="even">
+<td>0x3F</td>
+<td>63</td>
+<td>?</td>
+<td>Question Mark</td>
+<td>问号</td>
+</tr>
+<tr class="odd">
+<td>0x40</td>
+<td>64</td>
+<td>@</td>
+<td>Commercial At</td>
+<td>@</td>
+</tr>
+</tbody>
+</table>
+<h3 id="大写字母0x41-0x5a">大写字母（0x41 ~ 0x5A）</h3>
+<table>
+<thead>
+<tr class="header">
+<th>Hex</th>
+<th>Dec</th>
+<th>缩写</th>
+<th>英文全称</th>
+<th>典型作用 / 说明</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>0x41</td>
+<td>65</td>
+<td>A</td>
+<td>Latin Capital Letter A</td>
+<td>大写 A</td>
+</tr>
+<tr class="even">
+<td>0x42</td>
+<td>66</td>
+<td>B</td>
+<td>Latin Capital Letter B</td>
+<td>大写 B</td>
+</tr>
+<tr class="odd">
+<td>0x43</td>
+<td>67</td>
+<td>C</td>
+<td>Latin Capital Letter C</td>
+<td>大写 C</td>
+</tr>
+<tr class="even">
+<td>0x44</td>
+<td>68</td>
+<td>D</td>
+<td>Latin Capital Letter D</td>
+<td>大写 D</td>
+</tr>
+<tr class="odd">
+<td>0x45</td>
+<td>69</td>
+<td>E</td>
+<td>Latin Capital Letter E</td>
+<td>大写 E</td>
+</tr>
+<tr class="even">
+<td>0x46</td>
+<td>70</td>
+<td>F</td>
+<td>Latin Capital Letter F</td>
+<td>大写 F</td>
+</tr>
+<tr class="odd">
+<td>0x47</td>
+<td>71</td>
+<td>G</td>
+<td>Latin Capital Letter G</td>
+<td>大写 G</td>
+</tr>
+<tr class="even">
+<td>0x48</td>
+<td>72</td>
+<td>H</td>
+<td>Latin Capital Letter H</td>
+<td>大写 H</td>
+</tr>
+<tr class="odd">
+<td>0x49</td>
+<td>73</td>
+<td>I</td>
+<td>Latin Capital Letter I</td>
+<td>大写 I</td>
+</tr>
+<tr class="even">
+<td>0x4A</td>
+<td>74</td>
+<td>J</td>
+<td>Latin Capital Letter J</td>
+<td>大写 J</td>
+</tr>
+<tr class="odd">
+<td>0x4B</td>
+<td>75</td>
+<td>K</td>
+<td>Latin Capital Letter K</td>
+<td>大写 K</td>
+</tr>
+<tr class="even">
+<td>0x4C</td>
+<td>76</td>
+<td>L</td>
+<td>Latin Capital Letter L</td>
+<td>大写 L</td>
+</tr>
+<tr class="odd">
+<td>0x4D</td>
+<td>77</td>
+<td>M</td>
+<td>Latin Capital Letter M</td>
+<td>大写 M</td>
+</tr>
+<tr class="even">
+<td>0x4E</td>
+<td>78</td>
+<td>N</td>
+<td>Latin Capital Letter N</td>
+<td>大写 N</td>
+</tr>
+<tr class="odd">
+<td>0x4F</td>
+<td>79</td>
+<td>O</td>
+<td>Latin Capital Letter O</td>
+<td>大写 O</td>
+</tr>
+<tr class="even">
+<td>0x50</td>
+<td>80</td>
+<td>P</td>
+<td>Latin Capital Letter P</td>
+<td>大写 P</td>
+</tr>
+<tr class="odd">
+<td>0x51</td>
+<td>81</td>
+<td>Q</td>
+<td>Latin Capital Letter Q</td>
+<td>大写 Q</td>
+</tr>
+<tr class="even">
+<td>0x52</td>
+<td>82</td>
+<td>R</td>
+<td>Latin Capital Letter R</td>
+<td>大写 R</td>
+</tr>
+<tr class="odd">
+<td>0x53</td>
+<td>83</td>
+<td>S</td>
+<td>Latin Capital Letter S</td>
+<td>大写 S</td>
+</tr>
+<tr class="even">
+<td>0x54</td>
+<td>84</td>
+<td>T</td>
+<td>Latin Capital Letter T</td>
+<td>大写 T</td>
+</tr>
+<tr class="odd">
+<td>0x55</td>
+<td>85</td>
+<td>U</td>
+<td>Latin Capital Letter U</td>
+<td>大写 U</td>
+</tr>
+<tr class="even">
+<td>0x56</td>
+<td>86</td>
+<td>V</td>
+<td>Latin Capital Letter V</td>
+<td>大写 V</td>
+</tr>
+<tr class="odd">
+<td>0x57</td>
+<td>87</td>
+<td>W</td>
+<td>Latin Capital Letter W</td>
+<td>大写 W</td>
+</tr>
+<tr class="even">
+<td>0x58</td>
+<td>88</td>
+<td>X</td>
+<td>Latin Capital Letter X</td>
+<td>大写 X</td>
+</tr>
+<tr class="odd">
+<td>0x59</td>
+<td>89</td>
+<td>Y</td>
+<td>Latin Capital Letter Y</td>
+<td>大写 Y</td>
+</tr>
+<tr class="even">
+<td>0x5A</td>
+<td>90</td>
+<td>Z</td>
+<td>Latin Capital Letter Z</td>
+<td>大写 Z</td>
+</tr>
+</tbody>
+</table>
+<h3 id="标点表30x5b-0x60">标点表3（0x5B ~ 0x60）</h3>
+<table>
+<thead>
+<tr class="header">
+<th>Hex</th>
+<th>Dec</th>
+<th>缩写</th>
+<th>英文全称</th>
+<th>典型作用 / 说明</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>0x5B</td>
+<td>91</td>
+<td>[</td>
+<td>Left Square Bracket</td>
+<td>左中括号</td>
+</tr>
+<tr class="even">
+<td>0x5C</td>
+<td>92</td>
+<td>\</td>
+<td>Reverse Solidus</td>
+<td>反斜杠</td>
+</tr>
+<tr class="odd">
+<td>0x5D</td>
+<td>93</td>
+<td>]</td>
+<td>Right Square Bracket</td>
+<td>右中括号</td>
+</tr>
+<tr class="even">
+<td>0x5E</td>
+<td>94</td>
+<td>^</td>
+<td>Circumflex Accent</td>
+<td>脱字符</td>
+</tr>
+<tr class="odd">
+<td>0x5F</td>
+<td>95</td>
+<td>_</td>
+<td>Low Line</td>
+<td>下划线</td>
+</tr>
+<tr class="even">
+<td>0x60</td>
+<td>96</td>
+<td>`</td>
+<td>Grave Accent</td>
+<td>反引号</td>
+</tr>
+</tbody>
+</table>
+<h3 id="小写字母0x61-0x7a">小写字母（0x61 ~ 0x7A）</h3>
+<table>
+<thead>
+<tr class="header">
+<th>Hex</th>
+<th>Dec</th>
+<th>缩写</th>
+<th>英文全称</th>
+<th>典型作用 / 说明</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>0x61</td>
+<td>97</td>
+<td>a</td>
+<td>Latin Small Letter a</td>
+<td>小写 a</td>
+</tr>
+<tr class="even">
+<td>0x62</td>
+<td>98</td>
+<td>b</td>
+<td>Latin Small Letter b</td>
+<td>小写 b</td>
+</tr>
+<tr class="odd">
+<td>0x63</td>
+<td>99</td>
+<td>c</td>
+<td>Latin Small Letter c</td>
+<td>小写 c</td>
+</tr>
+<tr class="even">
+<td>0x64</td>
+<td>100</td>
+<td>d</td>
+<td>Latin Small Letter d</td>
+<td>小写 d</td>
+</tr>
+<tr class="odd">
+<td>0x65</td>
+<td>101</td>
+<td>e</td>
+<td>Latin Small Letter e</td>
+<td>小写 e</td>
+</tr>
+<tr class="even">
+<td>0x66</td>
+<td>102</td>
+<td>f</td>
+<td>Latin Small Letter f</td>
+<td>小写 f</td>
+</tr>
+<tr class="odd">
+<td>0x67</td>
+<td>103</td>
+<td>g</td>
+<td>Latin Small Letter g</td>
+<td>小写 g</td>
+</tr>
+<tr class="even">
+<td>0x68</td>
+<td>104</td>
+<td>h</td>
+<td>Latin Small Letter h</td>
+<td>小写 h</td>
+</tr>
+<tr class="odd">
+<td>0x69</td>
+<td>105</td>
+<td>i</td>
+<td>Latin Small Letter i</td>
+<td>小写 i</td>
+</tr>
+<tr class="even">
+<td>0x6A</td>
+<td>106</td>
+<td>j</td>
+<td>Latin Small Letter j</td>
+<td>小写 j</td>
+</tr>
+<tr class="odd">
+<td>0x6B</td>
+<td>107</td>
+<td>k</td>
+<td>Latin Small Letter k</td>
+<td>小写 k</td>
+</tr>
+<tr class="even">
+<td>0x6C</td>
+<td>108</td>
+<td>l</td>
+<td>Latin Small Letter l</td>
+<td>小写 l</td>
+</tr>
+<tr class="odd">
+<td>0x6D</td>
+<td>109</td>
+<td>m</td>
+<td>Latin Small Letter m</td>
+<td>小写 m</td>
+</tr>
+<tr class="even">
+<td>0x6E</td>
+<td>110</td>
+<td>n</td>
+<td>Latin Small Letter n</td>
+<td>小写 n</td>
+</tr>
+<tr class="odd">
+<td>0x6F</td>
+<td>111</td>
+<td>o</td>
+<td>Latin Small Letter o</td>
+<td>小写 o</td>
+</tr>
+<tr class="even">
+<td>0x70</td>
+<td>112</td>
+<td>p</td>
+<td>Latin Small Letter p</td>
+<td>小写 p</td>
+</tr>
+<tr class="odd">
+<td>0x71</td>
+<td>113</td>
+<td>q</td>
+<td>Latin Small Letter q</td>
+<td>小写 q</td>
+</tr>
+<tr class="even">
+<td>0x72</td>
+<td>114</td>
+<td>r</td>
+<td>Latin Small Letter r</td>
+<td>小写 r</td>
+</tr>
+<tr class="odd">
+<td>0x73</td>
+<td>115</td>
+<td>s</td>
+<td>Latin Small Letter s</td>
+<td>小写 s</td>
+</tr>
+<tr class="even">
+<td>0x74</td>
+<td>116</td>
+<td>t</td>
+<td>Latin Small Letter t</td>
+<td>小写 t</td>
+</tr>
+<tr class="odd">
+<td>0x75</td>
+<td>117</td>
+<td>u</td>
+<td>Latin Small Letter u</td>
+<td>小写 u</td>
+</tr>
+<tr class="even">
+<td>0x76</td>
+<td>118</td>
+<td>v</td>
+<td>Latin Small Letter v</td>
+<td>小写 v</td>
+</tr>
+<tr class="odd">
+<td>0x77</td>
+<td>119</td>
+<td>w</td>
+<td>Latin Small Letter w</td>
+<td>小写 w</td>
+</tr>
+<tr class="even">
+<td>0x78</td>
+<td>120</td>
+<td>x</td>
+<td>Latin Small Letter x</td>
+<td>小写 x</td>
+</tr>
+<tr class="odd">
+<td>0x79</td>
+<td>121</td>
+<td>y</td>
+<td>Latin Small Letter y</td>
+<td>小写 y</td>
+</tr>
+<tr class="even">
+<td>0x7A</td>
+<td>122</td>
+<td>z</td>
+<td>Latin Small Letter z</td>
+<td>小写 z</td>
+</tr>
+</tbody>
+</table>
+<h3 id="标点表40x7b-0x7e">标点表4（0x7B ~ 0x7E）</h3>
+<table>
+<thead>
+<tr class="header">
+<th>Hex</th>
+<th>Dec</th>
+<th>缩写</th>
+<th>英文全称</th>
+<th>典型作用 / 说明</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>0x7B</td>
+<td>123</td>
+<td>{</td>
+<td>Left Curly Brace</td>
+<td>左大括号</td>
+</tr>
+<tr class="even">
+<td>0x7C</td>
+<td>124</td>
+<td>|</td>
+<td>Vertical Line</td>
+<td>竖线</td>
+</tr>
+<tr class="odd">
+<td>0x7D</td>
+<td>125</td>
+<td>}</td>
+<td>Right Curly Brace</td>
+<td>右大括号</td>
+</tr>
+<tr class="even">
+<td>0x7E</td>
+<td>126</td>
+<td>~</td>
+<td>Tilde</td>
+<td>波浪号</td>
+</tr>
+</tbody>
+</table>
+<h2 id="特殊字符0x7f">特殊字符（0x7F）</h2>
+<table>
+<thead>
+<tr class="header">
+<th>Hex</th>
+<th>Dec</th>
+<th>缩写</th>
+<th>英文全称</th>
+<th>典型作用 / 说明</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
 <td>0x7F</td>
+<td>127</td>
 <td>DEL</td>
 <td>Delete</td>
-<td>删除（早期纸带“擦除”）</td>
+<td>删除</td>
 </tr>
 </tbody>
 </table>
