@@ -1,6 +1,239 @@
 <?xml version="1.0" encoding="utf-8"?>
 <search>
   <entry>
+    <title>计算机基础-ASCII码总表</title>
+    <url>/2025/12/01/%E8%AE%A1%E7%AE%97%E6%9C%BA%E5%9F%BA%E7%A1%80-ASCII%E7%A0%81%E6%80%BB%E8%A1%A8/</url>
+    <content><![CDATA[<h1 id="ascii码表">ASCII码表</h1>
+<h2 id="控制字符">控制字符</h2>
+<table>
+<colgroup>
+<col style="width: 6%">
+<col style="width: 6%">
+<col style="width: 39%">
+<col style="width: 48%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Hex</th>
+<th>缩写</th>
+<th>英文全称</th>
+<th>典型作用 / 说明</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>0x00</td>
+<td>NUL</td>
+<td>Null</td>
+<td>字符串结束、占位、填充</td>
+</tr>
+<tr class="even">
+<td>0x01</td>
+<td>SOH</td>
+<td>Start of Heading</td>
+<td>数据块开始（早期通信）</td>
+</tr>
+<tr class="odd">
+<td>0x02</td>
+<td>STX</td>
+<td>Start of Text</td>
+<td>正文开始</td>
+</tr>
+<tr class="even">
+<td>0x03</td>
+<td>ETX</td>
+<td>End of Text</td>
+<td>正文结束，<strong>Ctrl+C</strong></td>
+</tr>
+<tr class="odd">
+<td>0x04</td>
+<td>EOT</td>
+<td>End of Transmission</td>
+<td>传输结束，<strong>Ctrl+D</strong></td>
+</tr>
+<tr class="even">
+<td>0x05</td>
+<td>ENQ</td>
+<td>Enquiry</td>
+<td>请求响应</td>
+</tr>
+<tr class="odd">
+<td>0x06</td>
+<td>ACK</td>
+<td>Acknowledge</td>
+<td>确认应答</td>
+</tr>
+<tr class="even">
+<td>0x07</td>
+<td>BEL</td>
+<td>Bell</td>
+<td>响铃（终端蜂鸣）</td>
+</tr>
+<tr class="odd">
+<td>0x08</td>
+<td>BS</td>
+<td>Backspace</td>
+<td>退格</td>
+</tr>
+<tr class="even">
+<td>0x09</td>
+<td>HT</td>
+<td>Horizontal Tab</td>
+<td>水平制表符（Tab）</td>
+</tr>
+<tr class="odd">
+<td>0x0A</td>
+<td>LF</td>
+<td>Line Feed</td>
+<td>换行（Unix 换行）</td>
+</tr>
+<tr class="even">
+<td>0x0B</td>
+<td>VT</td>
+<td>Vertical Tab</td>
+<td>垂直制表</td>
+</tr>
+<tr class="odd">
+<td>0x0C</td>
+<td>FF</td>
+<td>Form Feed</td>
+<td>换页</td>
+</tr>
+<tr class="even">
+<td>0x0D</td>
+<td>CR</td>
+<td>Carriage Return</td>
+<td>回车（<code>\\r</code>）</td>
+</tr>
+<tr class="odd">
+<td>0x0E</td>
+<td>SO</td>
+<td>Shift Out</td>
+<td>切换字符集</td>
+</tr>
+<tr class="even">
+<td>0x0F</td>
+<td>SI</td>
+<td>Shift In</td>
+<td>恢复字符集</td>
+</tr>
+<tr class="odd">
+<td>0x10</td>
+<td>DLE</td>
+<td>Data Link Escape</td>
+<td>数据链路转义</td>
+</tr>
+<tr class="even">
+<td>0x11</td>
+<td>DC1</td>
+<td>Device Control 1</td>
+<td>XON（软件流控）</td>
+</tr>
+<tr class="odd">
+<td>0x12</td>
+<td>DC2</td>
+<td>Device Control 2</td>
+<td>设备控制</td>
+</tr>
+<tr class="even">
+<td>0x13</td>
+<td>DC3</td>
+<td>Device Control 3</td>
+<td>XOFF（软件流控）</td>
+</tr>
+<tr class="odd">
+<td>0x14</td>
+<td>DC4</td>
+<td>Device Control 4</td>
+<td>设备控制</td>
+</tr>
+<tr class="even">
+<td>0x15</td>
+<td>NAK</td>
+<td>Negative Acknowledge</td>
+<td>否认应答</td>
+</tr>
+<tr class="odd">
+<td>0x16</td>
+<td>SYN</td>
+<td>Synchronous Idle</td>
+<td>同步空闲</td>
+</tr>
+<tr class="even">
+<td>0x17</td>
+<td>ETB</td>
+<td>End of Transmission Block</td>
+<td>传输块结束</td>
+</tr>
+<tr class="odd">
+<td>0x18</td>
+<td>CAN</td>
+<td>Cancel</td>
+<td>取消操作 / 传输</td>
+</tr>
+<tr class="even">
+<td>0x19</td>
+<td>EM</td>
+<td>End of Medium</td>
+<td>介质结束</td>
+</tr>
+<tr class="odd">
+<td>0x1A</td>
+<td>SUB</td>
+<td>Substitute</td>
+<td>EOF（Windows 文本），<strong>Ctrl+Z</strong></td>
+</tr>
+<tr class="even">
+<td>0x1B</td>
+<td>ESC</td>
+<td>Escape</td>
+<td>转义字符（ANSI 控制序列）</td>
+</tr>
+<tr class="odd">
+<td>0x1C</td>
+<td>FS</td>
+<td>File Separator</td>
+<td>文件分隔符</td>
+</tr>
+<tr class="even">
+<td>0x1D</td>
+<td>GS</td>
+<td>Group Separator</td>
+<td>组分隔符</td>
+</tr>
+<tr class="odd">
+<td>0x1E</td>
+<td>RS</td>
+<td>Record Separator</td>
+<td>记录分隔符</td>
+</tr>
+<tr class="even">
+<td>0x1F</td>
+<td>US</td>
+<td>Unit Separator</td>
+<td>单元分隔符</td>
+</tr>
+<tr class="odd">
+<td>0x7F</td>
+<td>DEL</td>
+<td>Delete</td>
+<td>删除（早期纸带“擦除”）</td>
+</tr>
+</tbody>
+</table>
+]]></content>
+      <categories>
+        <category>Computer</category>
+        <category>ASCII</category>
+      </categories>
+  </entry>
+  <entry>
+    <title>Linux驱动-USB设备描述符简介</title>
+    <url>/2025/10/22/Linux%E9%A9%B1%E5%8A%A8-USB%E8%AE%BE%E5%A4%87%E6%8F%8F%E8%BF%B0%E7%AC%A6%E7%AE%80%E4%BB%8B/</url>
+    <content><![CDATA[
+]]></content>
+  </entry>
+  <entry>
     <title>Linux驱动-USB协议栈简介</title>
     <url>/2025/09/01/Linux%E9%A9%B1%E5%8A%A8-USB%E5%8D%8F%E8%AE%AE%E6%A0%88%E7%AE%80%E4%BB%8B/</url>
     <content><![CDATA[<blockquote>
