@@ -4851,6 +4851,23 @@ LUT</a> ，扫描码到ASCII码的转换表格请读者自己生成。</p>
 <h4 id="shift">shift</h4>
 <p>基本格式：<code>shift [n]</code></p>
 <p>将参数左移n位，默认值为1</p>
+<h3 id="变量用法">变量用法</h3>
+<h4 id="基本用法">基本用法</h4>
+<p>使用示例</p>
+<figure class="highlight sh"><table><tr><td class="code"><pre><span class="line"><span class="comment"># 变量赋值</span></span><br><span class="line">var=<span class="string">&quot;/root/project/abc&quot;</span></span><br><span class="line"><span class="comment"># 变量使用</span></span><br><span class="line"><span class="built_in">echo</span> <span class="variable">$var</span> <span class="variable">$&#123;var&#125;</span></span><br></pre></td></tr></table></figure>
+<h4 id="变量展开">变量展开</h4>
+<p>又名shell参数展开，基本格式</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">$&#123;变量##模式&#125;</span><br><span class="line">$&#123;变量#模式&#125;</span><br><span class="line">$&#123;变量%%模式&#125;</span><br><span class="line">$&#123;变量%模式&#125;</span><br></pre></td></tr></table></figure>
+<p>模式支持的符号：</p>
+<ul>
+<li><code>*</code> 匹配任意字符串</li>
+<li><code>?</code> 匹配任意单个字符</li>
+<li><code>[...]</code>
+匹配字符集，比如：范围<code>[0-9a-z]</code>，取反<code>[!abc]</code>或<code>[^abc]</code></li>
+<li><code>\</code> 匹配转义字符，比如：<code>*</code></li>
+</ul>
+<p>使用示例</p>
+<figure class="highlight sh"><table><tr><td class="code"><pre><span class="line">$ var=<span class="string">&quot;/root/project/abc&quot;</span></span><br><span class="line"><span class="comment"># 从左开始，最小匹配模式删除匹配字符串</span></span><br><span class="line">$ <span class="built_in">echo</span> <span class="variable">$&#123;var#*/&#125;</span></span><br><span class="line">root/project/abc</span><br><span class="line"></span><br><span class="line"><span class="comment"># 从左开始，最大匹配模式删除匹配字符串</span></span><br><span class="line">$ <span class="built_in">echo</span> <span class="variable">$&#123;var##*/&#125;</span></span><br><span class="line">abc</span><br><span class="line"></span><br><span class="line"><span class="comment"># 从右开始，最小匹配模式删除匹配字符串</span></span><br><span class="line">$ <span class="built_in">echo</span> <span class="variable">$&#123;var%/*&#125;</span></span><br><span class="line">/root/project</span><br><span class="line"><span class="comment"># 从右开始，最大匹配模式删除匹配字符串</span></span><br><span class="line">$ <span class="built_in">echo</span> <span class="variable">$&#123;var%%/*&#125;</span></span><br><span class="line"></span><br></pre></td></tr></table></figure>
 <h3 id="交互界面">交互界面</h3>
 <p>基本操作</p>
 <ul>
