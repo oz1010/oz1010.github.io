@@ -1,6 +1,297 @@
 <?xml version="1.0" encoding="utf-8"?>
 <search>
   <entry>
+    <title>常用工具-Vim简介</title>
+    <url>/2026/04/14/%E5%B8%B8%E7%94%A8%E5%B7%A5%E5%85%B7-Vim%E7%AE%80%E4%BB%8B/</url>
+    <content><![CDATA[<h2 id="核心架构选择">核心架构选择</h2>
+<p>目前最主流、性能最强的组合是：</p>
+<ul>
+<li><strong>插件管理器</strong>: <code>vim-plug</code> (轻量、易用)</li>
+<li><strong>LSP 客户端</strong>: <code>coc.nvim</code> (开箱即用，类似
+VS Code 的体验)</li>
+<li><strong>C++ 语言服务器</strong>: <code>clangd</code> (LLVM
+官方出品，解析索引最准)</li>
+<li><strong>模糊查找</strong>: <code>fzf.vim</code> 或
+<code>telescope.nvim</code></li>
+</ul>
+<h2 id="准备工作">准备工作</h2>
+<h3 id="安装工具">安装工具</h3>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">add-apt-repository ppa:jonathonf/vim</span><br><span class="line">apt-get install -y vim clangd ripgrep universal-ctags</span><br></pre></td></tr></table></figure>
+<h3 id="安装nodejs">安装nodejs</h3>
+<p>下载https://nodejs.org/en/download/</p>
+<p>如果你只需要一个固定的稳定版本（如 Node.js 20.x），使用 NodeSource
+提供的官方脚本是最直接的。</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line"># 以 Node.js 24.14.1(LST) 为例</span><br><span class="line">curl -fsSL https://deb.nodesource.com/setup_24.x | sudo -E bash -</span><br><span class="line">apt-get install -y nodejs</span><br></pre></td></tr></table></figure>
+<h3 id="安装插件">安装插件</h3>
+<p>~/.vimrc文件内容</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">call plug#begin(&#x27;~/.vim/plugged&#x27;)</span><br><span class="line"></span><br><span class="line">&quot; 全能补全与跳转 (需要 Node.js)</span><br><span class="line">Plug &#x27;neoclide/coc.nvim&#x27;, &#123;&#x27;branch&#x27;: &#x27;release&#x27;&#125;</span><br><span class="line"></span><br><span class="line">&quot; 模糊搜索：快速打开工程内的文件/函数</span><br><span class="line">Plug &#x27;junegunn/fzf&#x27;, &#123; &#x27;do&#x27;: &#123; -&gt; fzf#install() &#125; &#125;</span><br><span class="line">Plug &#x27;junegunn/fzf.vim&#x27;</span><br><span class="line"></span><br><span class="line">&quot; 目录树：查看工程结构</span><br><span class="line">Plug &#x27;preservim/nerdtree&#x27;</span><br><span class="line"></span><br><span class="line">&quot; 状态栏：显示当前位置</span><br><span class="line">Plug &#x27;vim-airline/vim-airline&#x27;</span><br><span class="line"></span><br><span class="line">call plug#end()</span><br></pre></td></tr></table></figure>
+<p>进入vim界面</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">:PlugInstall</span><br></pre></td></tr></table></figure>
+<h2 id="功能配置与操作">功能配置与操作</h2>
+<h3 id="实现函数定义查看-lsp">实现函数定义查看 (LSP)</h3>
+<p>安装完插件后，在 Vim 中执行 <code>:CocInstall coc-clangd</code>。
+为了实现快速跳转，建议在 <code>.vimrc</code> 中映射快捷键：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">&quot; 跳转到定义 (Definition)</span><br><span class="line">nmap &lt;silent&gt; gd &lt;Plug&gt;(coc-definition)</span><br><span class="line">&quot; 跳转到类型定义 (Type Definition)</span><br><span class="line">nmap &lt;silent&gt; gy &lt;Plug&gt;(coc-type-definition)</span><br><span class="line">&quot; 查找引用 (References)</span><br><span class="line">nmap &lt;silent&gt; gr &lt;Plug&gt;(coc-references)</span><br><span class="line">&quot; 查看文档说明 (Hover)</span><br><span class="line">nnoremap &lt;silent&gt; K :call CocActionAsync(&#x27;doHover&#x27;)&lt;CR&gt;</span><br></pre></td></tr></table></figure>
+<blockquote>
+<p><strong>注意</strong>：为了让 <code>clangd</code>
+精确识别工程，建议在工程根目录下通过 CMake 生成
+<code>compile_commands.json</code> 文件：
+<code>cmake -DCMAKE_EXPORT_COMPILE_COMMANDS=1 .</code></p>
+</blockquote>
+<h3 id="多文档跳转与全局搜索">多文档跳转与全局搜索</h3>
+<p>使用 <code>fzf.vim</code> 可以像 VS Code 的 <code>Ctrl+P</code>
+一样在数万个文件中瞬间定位。</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">&quot; Ctrl+p 搜索工程文件</span><br><span class="line">nnoremap &lt;C-p&gt; :Files&lt;CR&gt;</span><br><span class="line">&quot; Ctrl+f 全局搜索字符串 (类似 grep)</span><br><span class="line">nnoremap &lt;C-f&gt; :Rg&lt;CR&gt;</span><br><span class="line">&quot; 查看当前打开的所有 Buffer</span><br><span class="line">nnoremap &lt;leader&gt;b :Buffers&lt;CR&gt;</span><br><span class="line">&quot; 查看当前文件中的函数列表</span><br><span class="line">nnoremap &lt;leader&gt;s :BTags&lt;CR&gt;</span><br></pre></td></tr></table></figure>
+<h3 id="工程管理-目录树">工程管理 (目录树)</h3>
+<p>使用 <code>NERDTree</code> 方便在不同模块间切换：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">&quot; Ctrl+n 开关目录树</span><br><span class="line">map &lt;C-n&gt; :NERDTreeToggle&lt;CR&gt;</span><br><span class="line">&quot; 显示隐藏文件</span><br><span class="line">let NERDTreeShowHidden=1</span><br></pre></td></tr></table></figure>
+<h2 id="进阶技巧多文档间的丝滑切换">进阶技巧：多文档间的“丝滑”切换</h2>
+<p>在阅读大型 C++ 工程时，仅仅有 <code>gd</code> (跳转定义)
+是不够的，你还需要“跳回来”：</p>
+<ol type="1">
+<li><strong>跳转回原位</strong>: 使用 Vim 内置的 <code>Ctrl + o</code>
+(回到上一个光标位置)，<code>Ctrl + i</code>
+(去往下一个位置)。这在深层调用链追踪时极其有用。</li>
+<li><strong>分屏阅读</strong>:
+在跳转定义时，如果想保留当前页面，可以使用 <code>:vsplit</code> 或在
+<code>fzf</code> 搜索列表中按 <code>Ctrl + v</code> 打开垂直分屏。</li>
+<li><strong>符号大纲</strong>: 输入 <code>:CocList outline</code>
+可以看到当前文件的所有类、变量和函数列表，支持实时搜索。</li>
+</ol>
+<h1 id="技巧1">技巧1</h1>
+<h3 id="leader键改为空格">leader键改为空格</h3>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">let mapleader = &quot;\&lt;Space&gt;&quot;</span><br></pre></td></tr></table></figure>
+<h2 id="基础分屏创建">1. 基础分屏创建</h2>
+<p>在跳转前，你可以先手动划分空间：</p>
+<ul>
+<li><strong><code>:sp</code> (split)</strong>: 水平分屏。</li>
+<li><strong><code>:vsp</code> (vsplit)</strong>:
+垂直分屏（阅读代码时最推荐，左右对比更清晰）。</li>
+<li><strong><code>:only</code></strong>:
+关闭除当前窗口外的所有窗口，回到全屏阅读。</li>
+</ul>
+<hr>
+<h2 id="联动跳转在分屏中打开定义">2. 联动跳转：在分屏中打开定义</h2>
+<p>这是阅读代码的核心痛点：你既想看定义的实现，又不想弄丢现在的上下文。</p>
+<h3 id="配合-lsp-coc.nvim-的跳转">配合 LSP (coc.nvim) 的跳转</h3>
+<p>在 <code>.vimrc</code>
+中配置以下“组合拳”，可以实现按键后直接在分屏中打开定义：</p>
+<p>Vim Script</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">&quot; 在水平分屏中打开定义</span><br><span class="line">nmap &lt;leader&gt;sp :call CocAction(&#x27;jumpDefinition&#x27;, &#x27;split&#x27;)&lt;CR&gt;</span><br><span class="line">&quot; 在垂直分屏中打开定义</span><br><span class="line">nmap &lt;leader&gt;vp :call CocAction(&#x27;jumpDefinition&#x27;, &#x27;vsplit&#x27;)&lt;CR&gt;</span><br><span class="line">&quot; 在新标签页中打开定义</span><br><span class="line">nmap &lt;leader&gt;tp :call CocAction(&#x27;jumpDefinition&#x27;, &#x27;tab&#x27;)&lt;CR&gt;</span><br></pre></td></tr></table></figure>
+<h3 id="配合-fzf.vim-的跳转">配合 fzf.vim 的跳转</h3>
+<p>当你使用 <code>:Files</code> 或 <code>:Rg</code> 搜索时：</p>
+<ul>
+<li>按下 <strong><code>Enter</code></strong>: 在当前窗口打开。</li>
+<li>按下 <strong><code>Ctrl + x</code></strong>: 水平分屏打开。</li>
+<li>按下 <strong><code>Ctrl + v</code></strong>: 垂直分屏打开。</li>
+<li>按下 <strong><code>Ctrl + t</code></strong>: 新标签页打开。</li>
+</ul>
+<hr>
+<h2 id="跨分屏的高效跳转与导航">3. 跨分屏的高效跳转与导航</h2>
+<p>当你开了 3-4 个分屏后，快速在屏幕间“穿梭”是进阶标志。</p>
+<h3 id="快速切换窗口">快速切换窗口</h3>
+<p>默认的 <code>Ctrl+w, h/j/k/l</code> 太慢了，建议映射为
+<code>Alt + 方向</code>：</p>
+<p>Vim Script</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">nnoremap &lt;M-h&gt; &lt;C-w&gt;h</span><br><span class="line">nnoremap &lt;M-j&gt; &lt;C-w&gt;j</span><br><span class="line">nnoremap &lt;M-k&gt; &lt;C-w&gt;k</span><br><span class="line">nnoremap &lt;M-l&gt; &lt;C-w&gt;l</span><br></pre></td></tr></table></figure>
+<h3 id="窗口大小调整">窗口大小调整</h3>
+<p>阅读长函数时，可能需要临时拉大窗口：</p>
+<ul>
+<li><strong><code>Ctrl+w, =</code></strong>: 所有窗口恢复等大。</li>
+<li><strong><code>Ctrl+w, _</code></strong>: 当前窗口高度最大化。</li>
+<li><strong><code>Ctrl+w, |</code></strong>: 当前窗口宽度最大化。</li>
+<li><strong><code>10 &gt;</code> 或 <code>10 &lt;</code></strong>:
+向左/右微调宽度。</li>
+</ul>
+<hr>
+<h2 id="终极技巧双栏同步滚动-scroll-bind">4. 终极技巧：双栏同步滚动
+(Scroll Bind)</h2>
+<p>当你需要对比两个相似的 C++ 文件（例如 <code>driver_v1.c</code> 和
+<code>driver_v2.c</code>）时，可以使用同步滚动：</p>
+<ol type="1">
+<li>垂直分屏打开两个文件。</li>
+<li>在每个窗口分别输入：<code>:set scrollbind</code>。</li>
+<li>此时滚动其中一个窗口，另一个会同步移动。输入
+<code>:set noscrollbind</code> 取消。</li>
+</ol>
+<hr>
+<h2 id="快速预览不离开主屏幕看定义">5. 快速预览：不离开主屏幕看定义</h2>
+<p>有时候你只是想瞟一眼函数的实现，不想真的跳过去。使用
+<code>coc.nvim</code> 的 <strong>Float Window (浮窗)</strong> 预览：</p>
+<ul>
+<li><strong>快捷键</strong>: <code>K</code> (对应上条回答中的
+<code>doHover</code> 映射)。</li>
+<li><strong>进阶</strong>: 如果光标在函数名上，执行
+<code>:CocAction('showSignatureHelp')</code>
+可以直接在浮窗里看参数类型。</li>
+</ul>
+<p><strong>小贴士</strong>：习惯使用
+<strong><code>Ctrl + o</code></strong> (Jump back) 和
+<strong><code>Ctrl + i</code></strong> (Jump
+forward)。无论你分了多少屏，Vim
+都会记录你的光标跳转序列，这是在多文档间反复横跳的“后悔药”。</p>
+<h1 id="技巧2">技巧2</h1>
+<h2 id="基础操作命令">1. 基础操作命令</h2>
+<p>你可以在 Vim 的命令行（按下 <code>:</code>）直接输入以下指令：</p>
+<table>
+<thead>
+<tr class="header">
+<th><strong>功能</strong></th>
+<th><strong>命令</strong></th>
+<th><strong>快捷键 (默认)</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>新建标签页</strong></td>
+<td><code>:tabnew [文件名]</code></td>
+<td>无</td>
+</tr>
+<tr class="even">
+<td><strong>关闭当前标签</strong></td>
+<td><code>:tabclose</code></td>
+<td>无</td>
+</tr>
+<tr class="odd">
+<td><strong>下一个标签</strong></td>
+<td><code>:tabnext</code></td>
+<td><code>gt</code></td>
+</tr>
+<tr class="even">
+<td><strong>上一个标签</strong></td>
+<td><code>:tabprev</code></td>
+<td><code>gT</code></td>
+</tr>
+<tr class="odd">
+<td><strong>跳到第 n 个标签</strong></td>
+<td><code>:tabn [n]</code></td>
+<td><code>[n]gt</code></td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="进阶快捷键建议">2. 进阶快捷键建议</h2>
+<p>默认的 <code>gt</code> 和 <code>gT</code>
+并不算特别顺手。既然你已经学会了设置 <code>&lt;leader&gt;</code>，建议在
+<code>.vimrc</code> 中添加以下映射，用数字键快速切换：</p>
+<p>Vim Script</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">&quot; 使用 Alt + 数字快速切换标签页</span><br><span class="line">nnoremap &lt;M-1&gt; 1gt</span><br><span class="line">nnoremap &lt;M-2&gt; 2gt</span><br><span class="line">nnoremap &lt;M-3&gt; 3gt</span><br><span class="line">nnoremap &lt;M-4&gt; 4gt</span><br><span class="line">nnoremap &lt;M-5&gt; 5gt</span><br><span class="line"></span><br><span class="line">&quot; 使用 Leader 键新建/关闭</span><br><span class="line">nnoremap &lt;leader&gt;tn :tabnew&lt;CR&gt;</span><br><span class="line">nnoremap &lt;leader&gt;tc :tabclose&lt;CR&gt;</span><br></pre></td></tr></table></figure>
+<hr>
+<h2 id="分屏与标签页的联动">3. 分屏与标签页的“联动”</h2>
+<p>当你正在分屏阅读一个 C++ 的 <code>.h</code> 和 <code>.cpp</code>
+文件，突然想跳到另一个完全不同的模块阅读，但不希望关掉现在的分屏布局时：</p>
+<ol type="1">
+<li><strong>当前窗口转为新标签</strong>: 按 <code>Ctrl + w</code>,
+接着按
+<code>T</code>（大写）。这会将当前焦点的分屏直接“抽离”出来，变成一个新的
+Tab。</li>
+<li><strong>在搜索中打开</strong>: 如果你使用 <code>fzf.vim</code>
+搜索文件，在列表里按
+<strong><code>Ctrl + t</code></strong>，选中的文件会直接在<strong>新标签页</strong>中打开，而不会覆盖你当前的工作区。</li>
+</ol>
+<hr>
+<h2 id="视觉增强标签栏">4. 视觉增强：标签栏</h2>
+<p>为了让你看清楚当前开了哪些标签，建议开启永久标签栏：</p>
+<p>Vim Script</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">&quot; 总是显示标签栏 (0: 不显示, 1: 至少两个时显示, 2: 总是显示)</span><br><span class="line">set showtabline=2</span><br></pre></td></tr></table></figure>
+<p>如果你安装了之前提到的 <code>vim-airline</code>
+插件，它会自动把标签栏美化得像浏览器一样，显示当前文件的名称和路径。</p>
+<hr>
+<h2 id="核心逻辑bufferwindow-与-tab-的关系">5. 核心逻辑：Buffer、Window
+与 Tab 的关系</h2>
+<p>理解这三者的关系，能让你在阅读代码时不再迷路：</p>
+<ul>
+<li><strong>Buffer (缓冲区)</strong>:
+只要你打开过一个文件，它就存在于内存中。即使你关掉了它的窗口，它依然在。</li>
+<li><strong>Window (窗口)</strong>: 就是你看到的“分屏”，它是展示 Buffer
+的容器。</li>
+<li><strong>Tab (标签页)</strong>: 它是 Window 的集合。你可以 Tab 1 看
+USB 驱动，Tab 2 看 SDL 渲染代码，互不干扰。</li>
+</ul>
+<blockquote>
+<p><strong>实用场景提示</strong>：在阅读 C++ 代码时，如果你用
+<code>gd</code>
+跳转到了一个深层函数，看一眼后想保持那个画面并开辟新战场，先执行
+<code>:tab split</code>。它会复制当前的布局到一个新标签页，让你放心地继续跳转。</p>
+</blockquote>
+<h1 id="技巧3">技巧3</h1>
+<h2 id="静态调用树查看谁调用了我-lsp">1. 静态调用树：查看“谁调用了我”
+(LSP)</h2>
+<p>如果你已经按照之前的配置安装了 <code>coc.nvim</code> 和
+<code>clangd</code>，你可以直接利用 LSP 的调用层级功能。</p>
+<p>在 <code>.vimrc</code> 中添加映射：</p>
+<p>Vim Script</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">&quot; 显示当前函数的调用者 (Incoming Calls)</span><br><span class="line">nnoremap &lt;leader&gt;ci :call CocAction(&#x27;showIncomingCalls&#x27;)&lt;CR&gt;</span><br><span class="line">&quot; 显示当前函数调用的子函数 (Outgoing Calls)</span><br><span class="line">nnoremap &lt;leader&gt;co :call CocAction(&#x27;showOutgoingCalls&#x27;)&lt;CR&gt;</span><br></pre></td></tr></table></figure>
+<p><strong>操作效果：</strong> 按下 <code>&lt;leader&gt;ci</code>
+后，Vim
+会弹出一个列表或侧边栏，列出所有调用当前函数的地方。你可以像预览目录树一样展开每一层，这是追踪
+<code>fcemu</code> 中底层硬件中断或 SDL 事件回调的最快方式。</p>
+<hr>
+<h2 id="符号搜索快速定位调用点">2. 符号搜索：快速定位调用点</h2>
+<p>如果你不需要完整的树状结构，只是想快速跳转到所有调用点，可以使用
+<code>fzf.vim</code>：</p>
+<p>Vim Script</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">&quot; 搜索光标下符号的所有引用 (References)</span><br><span class="line">nnoremap &lt;leader&gt;gr :References&lt;CR&gt;</span><br></pre></td></tr></table></figure>
+<p>这会在屏幕下方打开一个模糊搜索窗口，实时显示所有调用该函数的文件行数和代码预览。</p>
+<hr>
+<h2 id="动态调用栈调试时的-stack-trace">3. 动态调用栈：调试时的 Stack
+Trace</h2>
+<p>如果你是在<strong>运行/调试</strong>程序（例如调试 <code>DWC3</code>
+控制器逻辑或内核模块），你需要的是真正的运行时堆栈。</p>
+<h3 id="方案-a使用-vimspector-全功能-gui-调试器">方案 A：使用 Vimspector
+(全功能 GUI 调试器)</h3>
+<p><code>Vimspector</code> 是 Vim
+上最强大的调试插件，支持图形化的堆栈显示。</p>
+<ol type="1">
+<li><strong>安装</strong>:
+<code>Plug 'puremourning/vimspector'</code></li>
+<li><strong>功能</strong>: 触发断点后，它会专门开一个名为
+<code>Stack Trace</code>
+的窗口，显示当前线程的调用深度，点击即可跳转。</li>
+</ol>
+<h3 id="方案-b内置-termdebug-gdb-联动">方案 B：内置 Termdebug (GDB
+联动)</h3>
+<p>如果你不想装重型插件，Vim 8.1+ 自带了 <code>termdebug</code>：</p>
+<ol type="1">
+<li>在 Vim 中输入 <code>:packadd termdebug</code>。</li>
+<li>输入 <code>:Termdebug [你的可执行程序]</code>。</li>
+<li>在 GDB 窗口运行程序并在断点停止。</li>
+<li>在 GDB 窗口输入 <code>bt</code> (backtrace)，Vim
+会实时联动源码窗口。</li>
+</ol>
+<hr>
+<h2 id="终极技巧使用导图式导航">4. 终极技巧：使用导图式导航</h2>
+<p>对于特别复杂的 C++ 类调用关系，理解 <strong>Buffer (缓冲区) -&gt;
+Window (窗口) -&gt; Tab (标签页)</strong>
+的逻辑能帮你手动“标记”调用栈：</p>
+<ul>
+<li><strong>标记位置</strong>: 在跳转前按 <code>ma</code>（做标记
+a）。</li>
+<li><strong>深层跳转</strong>: <code>gd</code> 跳进函数。</li>
+<li><strong>回溯</strong>: 按 <code>'a</code>（回到标记
+a）或者使用内置的 <strong>Tag Stack</strong>。</li>
+</ul>
+<h3 id="查看跳转历史你的私人调用路径">查看跳转历史（你的私人调用路径）</h3>
+<p>Vim
+会记录你的跳转轨迹，输入以下命令可以查看你刚刚是怎么“跳”过来的：</p>
+<p>Vim Script</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">:tags</span><br></pre></td></tr></table></figure>
+<p>这会显示一个列表，告诉你你从哪个文件的哪一行跳转到了当前位置。配合
+<code>Ctrl + t</code> 往回跳，这就是最原始但也最可靠的“手动调用栈”。</p>
+<hr>
+<h3 id="建议配置汇总">建议配置汇总</h3>
+<p>为了方便阅读，建议将这几个功能组合在一起：</p>
+<p>Vim Script</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">&quot; 静态分析用 LSP</span><br><span class="line">nnoremap &lt;silent&gt; &lt;leader&gt;st :call CocAction(&#x27;showIncomingCalls&#x27;)&lt;CR&gt;</span><br><span class="line">&quot; 快速查看引用</span><br><span class="line">nnoremap &lt;silent&gt; &lt;leader&gt;rf :CocList references&lt;CR&gt;</span><br><span class="line">&quot; 查看跳转历史</span><br><span class="line">nnoremap &lt;silent&gt; &lt;leader&gt;hi :tags&lt;CR&gt;</span><br></pre></td></tr></table></figure>
+<h1 id="完整配置">完整配置</h1>
+<p>$ cat ~/.vimrc</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">call plug#begin(&#x27;~/.vim/plugged&#x27;)</span><br><span class="line"></span><br><span class="line">&quot; 全能补全与跳转 (需要 Node.js)</span><br><span class="line">Plug &#x27;neoclide/coc.nvim&#x27;, &#123;&#x27;branch&#x27;: &#x27;release&#x27;&#125;</span><br><span class="line"></span><br><span class="line">&quot; 模糊搜索：快速打开工程内的文件/函数</span><br><span class="line">Plug &#x27;junegunn/fzf&#x27;, &#123; &#x27;do&#x27;: &#123; -&gt; fzf#install() &#125; &#125;</span><br><span class="line">Plug &#x27;junegunn/fzf.vim&#x27;</span><br><span class="line"></span><br><span class="line">&quot; 目录树：查看工程结构</span><br><span class="line">Plug &#x27;preservim/nerdtree&#x27;</span><br><span class="line"></span><br><span class="line">&quot; 状态栏：显示当前位置</span><br><span class="line">Plug &#x27;vim-airline/vim-airline&#x27;</span><br><span class="line"></span><br><span class="line">call plug#end()</span><br><span class="line"></span><br><span class="line">let mapleader = &quot;\&lt;Space&gt;&quot;</span><br><span class="line"></span><br><span class="line">&quot; 跳转到定义 (Definition)</span><br><span class="line">nmap &lt;silent&gt; gd &lt;Plug&gt;(coc-definition)</span><br><span class="line">&quot; 跳转到类型定义 (Type Definition)</span><br><span class="line">nmap &lt;silent&gt; gy &lt;Plug&gt;(coc-type-definition)</span><br><span class="line">&quot; 查找引用 (References)</span><br><span class="line">nmap &lt;silent&gt; gr &lt;Plug&gt;(coc-references)</span><br><span class="line">&quot; 查看文档说明 (Hover)</span><br><span class="line">nnoremap &lt;silent&gt; K :call CocActionAsync(&#x27;doHover&#x27;)&lt;CR&gt;</span><br><span class="line"></span><br><span class="line">&quot; Ctrl+p 搜索工程文件</span><br><span class="line">nnoremap &lt;C-p&gt; :Files&lt;CR&gt;</span><br><span class="line">&quot; Ctrl+f 全局搜索字符串 (类似 grep)</span><br><span class="line">nnoremap &lt;C-f&gt; :Rg&lt;CR&gt;</span><br><span class="line">&quot; 查看当前打开的所有 Buffer</span><br><span class="line">nnoremap &lt;leader&gt;b :Buffers&lt;CR&gt;</span><br><span class="line">&quot; 查看当前文件中的函数列表</span><br><span class="line">nnoremap &lt;leader&gt;s :BTags&lt;CR&gt;</span><br><span class="line"></span><br><span class="line">&quot; Ctrl+n 开关目录树</span><br><span class="line">map &lt;C-n&gt; :NERDTreeToggle&lt;CR&gt;</span><br><span class="line">&quot; 显示隐藏文件</span><br><span class="line">let NERDTreeShowHidden=1</span><br><span class="line"></span><br><span class="line">&quot; 在水平分屏中打开定义</span><br><span class="line">nmap &lt;leader&gt;sp :call CocAction(&#x27;jumpDefinition&#x27;, &#x27;split&#x27;)&lt;CR&gt;</span><br><span class="line">&quot; 在垂直分屏中打开定义</span><br><span class="line">nmap &lt;leader&gt;vp :call CocAction(&#x27;jumpDefinition&#x27;, &#x27;vsplit&#x27;)&lt;CR&gt;</span><br><span class="line">&quot; 在新标签页中打开定义</span><br><span class="line">nmap &lt;leader&gt;tp :call CocAction(&#x27;jumpDefinition&#x27;, &#x27;tab&#x27;)&lt;CR&gt;</span><br><span class="line"></span><br><span class="line">&quot; 分屏操作</span><br><span class="line">nnoremap &lt;M-h&gt; &lt;C-w&gt;h</span><br><span class="line">nnoremap &lt;M-j&gt; &lt;C-w&gt;j</span><br><span class="line">nnoremap &lt;M-k&gt; &lt;C-w&gt;k</span><br><span class="line">nnoremap &lt;M-l&gt; &lt;C-w&gt;l</span><br><span class="line"></span><br><span class="line">&quot; 使用 Alt + 数字快速切换标签页</span><br><span class="line">nnoremap &lt;M-1&gt; :tabn 1&lt;CR&gt;</span><br><span class="line">nnoremap &lt;M-2&gt; :tabn 2&lt;CR&gt;</span><br><span class="line">nnoremap &lt;M-3&gt; :tabn 3&lt;CR&gt;</span><br><span class="line">nnoremap &lt;M-4&gt; :tabn 4&lt;CR&gt;</span><br><span class="line">nnoremap &lt;M-5&gt; :tabn 5&lt;CR&gt;</span><br><span class="line"></span><br><span class="line">&quot; 使用 Leader 键新建/关闭</span><br><span class="line">nnoremap &lt;leader&gt;tn :tabnew&lt;CR&gt;</span><br><span class="line">nnoremap &lt;leader&gt;tc :tabclose&lt;CR&gt;</span><br><span class="line"></span><br><span class="line">let g:fzf_action = &#123;</span><br><span class="line">  \ &#x27;ctrl-t&#x27;: &#x27;tab split&#x27;,</span><br><span class="line">  \ &#x27;ctrl-x&#x27;: &#x27;split&#x27;,</span><br><span class="line">  \ &#x27;ctrl-v&#x27;: &#x27;vsplit&#x27; &#125;</span><br><span class="line"></span><br><span class="line">&quot; 显示当前函数的调用者 (Incoming Calls)</span><br><span class="line">nnoremap &lt;leader&gt;ci :call CocAction(&#x27;showIncomingCalls&#x27;)&lt;CR&gt;</span><br><span class="line">&quot; 显示当前函数调用的子函数 (Outgoing Calls)</span><br><span class="line">nnoremap &lt;leader&gt;co :call CocAction(&#x27;showOutgoingCalls&#x27;)&lt;CR&gt;</span><br></pre></td></tr></table></figure>
+]]></content>
+      <categories>
+        <category>常用工具</category>
+      </categories>
+  </entry>
+  <entry>
     <title>Linux驱动-内核调试手段</title>
     <url>/2026/03/27/Linux%E9%A9%B1%E5%8A%A8-%E5%86%85%E6%A0%B8%E8%B0%83%E8%AF%95%E6%89%8B%E6%AE%B5/</url>
     <content><![CDATA[<p>以下代码示例都是以Linux开源社区代码为示例，其他版本可能存在差异，版本信息如下：</p>
@@ -6777,6 +7068,9 @@ trace特性，有些trace需要通过ftrace接口得到。</p>
 <p>生成热力图类似</p>
 <figure class="highlight sh"><table><tr><td class="code"><pre><span class="line">git <span class="built_in">clone</span> https://github.com/brendangregg/HeatMap      <span class="comment"># or download it from github</span></span><br><span class="line"><span class="built_in">mv</span> perf.data HeatMap/</span><br><span class="line"><span class="built_in">cd</span> HeatMap</span><br><span class="line">perf script | awk <span class="string">&#x27;&#123; gsub(/:/, &quot;&quot;) &#125; $5 ~ /issue/ &#123; ts[$6, $10] = $4 &#125; $5 ~ /complete/ &#123; if (l = ts[$6, $9]) &#123; printf &quot;%.f %.f\n&quot;, $4 * 1000000, ($4 - l) * 1000000; ts[$6, $10] = 0 &#125; &#125;&#x27;</span> &gt; out.lat_us</span><br><span class="line">./trace2heatmap.pl --unitstime=us --unitslat=us --maxlat=50000 out.lat_us &gt; out.svg</span><br></pre></td></tr></table></figure>
 ]]></content>
+      <categories>
+        <category>常用工具</category>
+      </categories>
   </entry>
   <entry>
     <title>编程语言-JavaScript学习笔记</title>
@@ -7453,6 +7747,9 @@ V2）的仿真调试工具的集合。Valgrind由内核（core）以及基于内
 <li>内存重复释放（Invalid free() / delete / delete[] / realloc()）</li>
 </ul>
 ]]></content>
+      <categories>
+        <category>常用工具</category>
+      </categories>
   </entry>
   <entry>
     <title>常用工具-Git简介</title>
@@ -7652,6 +7949,9 @@ V2）的仿真调试工具的集合。Valgrind由内核（core）以及基于内
 <figcaption aria-hidden="true">image-20230323105025239</figcaption>
 </figure>
 ]]></content>
+      <categories>
+        <category>常用工具</category>
+      </categories>
   </entry>
   <entry>
     <title>Ubuntu20使用</title>
