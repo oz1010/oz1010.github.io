@@ -6006,11 +6006,56 @@ dump。</li>
 <h3 id="explict">explict</h3>
 <h3 id="friend">friend</h3>
 <h2 id="内存分布">内存分布</h2>
-<h3 id="全局区">全局区</h3>
-<h3 id="堆区">堆区</h3>
-<h3 id="栈区">栈区</h3>
-<h3 id="常量区">常量区</h3>
-<h3 id="代码区">代码区</h3>
+<h3 id="代码区text">代码区(Text)</h3>
+<p>编译器编译源码后集中存放机器指令的区域，需要系统加载到指定内存地址（虚拟地址）才能够正常运行。</p>
+<ul>
+<li><p><strong>存储内容</strong>：CPU 执行的机器指令。</p></li>
+<li><p><strong>特点</strong>：只读且共享（如果有多个进程运行同一个程序，它们可以共享内存中的指令段）。</p></li>
+</ul>
+<h3 id="栈区stack">栈区(Stack)</h3>
+<p>栈由编译器自动分配和释放。它遵循“后进先出”（LIFO）的原则。x86一般向低地址增长。</p>
+<ul>
+<li><p><strong>存储内容</strong>：局部变量、函数参数、返回地址。</p></li>
+<li><p><strong>特点</strong>：速度极快，空间有限（通常只有几
+MB）。</p></li>
+<li><p><strong>生存期</strong>：随着函数调用的结束，栈帧会被弹出，内存自动回收。</p></li>
+</ul>
+<h3 id="堆区heap">堆区(Heap)</h3>
+<p>堆是由程序员手动控制的区域。在 C++ 中，我们通过 <code>new</code> 或
+<code>malloc</code> 申请，通过 <code>delete</code> 或 <code>free</code>
+释放。x86一般向高地址增长。</p>
+<ul>
+<li><strong>存储内容</strong>：动态分配的对象或数组。</li>
+<li><strong>特点</strong>：空间大（受限于虚拟内存），速度比栈慢，容易产生内存碎片。</li>
+<li><strong>生存期</strong>：由程序员控制。如果你忘记释放，就会导致<strong>内存泄漏</strong>。</li>
+</ul>
+<h3 id="常量区constant">常量区(Constant)</h3>
+<ul>
+<li><p><strong>存储内容</strong>：常量字符串（如
+<code>"Hello World"</code>）以及被 <code>const</code>
+修饰的全局变量。</p></li>
+<li><p><strong>特点</strong>：只读。尝试修改这部分内存会导致运行时的访问冲突。</p></li>
+</ul>
+<h3 id="全局静态存储区global">全局/静态存储区(Global)</h3>
+<p>这一块区域在程序启动时分配，程序结束时释放。</p>
+<ul>
+<li><p><strong>.data
+段</strong>：存储<strong>已初始化</strong>的全局变量和静态变量。</p></li>
+<li><p><strong>.bss
+段</strong>：存储<strong>未初始化</strong>（或初始化为
+0）的全局变量和静态变量。</p>
+<blockquote>
+<p><strong>小知识</strong>：BSS
+段不占用可执行文件实际的大小，只记录所需的空间，在加载时由 OS 清零。</p>
+</blockquote></li>
+</ul>
+<h3 id="示例代码">示例代码</h3>
+<p>Makefile</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">TARGET ?= main</span><br><span class="line">RUN_ARGS ?= </span><br><span class="line"></span><br><span class="line">all: $(TARGET)</span><br><span class="line"></span><br><span class="line">$(TARGET): main.cpp</span><br><span class="line">	@g++ -g -O0 -o $@ $&lt;</span><br><span class="line">run: all</span><br><span class="line">	@./$(TARGET) $(RUN_ARGS)</span><br><span class="line">clean:</span><br><span class="line">	@rm -f $(TARGET)</span><br><span class="line"></span><br><span class="line">.PHONY: all</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+<p>main.cpp</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">#include &lt;iostream&gt;</span><br><span class="line"></span><br><span class="line">using namespace std;</span><br><span class="line"></span><br><span class="line">const char *str1 = &quot;Hello world1&quot;;</span><br><span class="line">const char *str2 = &quot;Hello world2&quot;;</span><br><span class="line"></span><br><span class="line">int main(int argc, const char *argv[]) &#123;</span><br><span class="line">  cout &lt;&lt; &quot;str1 &quot; &lt;&lt; &amp;str1 &lt;&lt; &quot; &quot; &lt;&lt; str1 &lt;&lt; endl;</span><br><span class="line">  cout &lt;&lt; &quot;str2 &quot; &lt;&lt; &amp;str2 &lt;&lt; &quot; &quot; &lt;&lt; str2 &lt;&lt; endl;</span><br><span class="line">  int v1;</span><br><span class="line">  cout &lt;&lt; &quot;v1 &quot; &lt;&lt; &amp;v1 &lt;&lt; endl;</span><br><span class="line">  int v2;</span><br><span class="line">  cout &lt;&lt; &quot;v2 &quot; &lt;&lt; &amp;v2 &lt;&lt; endl;</span><br><span class="line">  auto p1 = new int();</span><br><span class="line">  cout &lt;&lt; &quot;p1 &quot; &lt;&lt; p1 &lt;&lt; endl;</span><br><span class="line">  auto p2 = new int();</span><br><span class="line">  cout &lt;&lt; &quot;p2 &quot; &lt;&lt; p2 &lt;&lt; endl;</span><br><span class="line">  return 0;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>输出信息</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">$ make run  </span><br><span class="line">str1 0x563ce0a0d010 Hello world1</span><br><span class="line">str2 0x563ce0a0d018 Hello world2</span><br><span class="line">v1 0x7ffe5fff6530</span><br><span class="line">v2 0x7ffe5fff6534</span><br><span class="line">p1 0x563cfced32c0</span><br><span class="line">p2 0x563cfced32e0</span><br><span class="line"></span><br><span class="line">$ readelf -S main  </span><br><span class="line">There are 37 section headers, starting at offset 0x7b20:</span><br><span class="line"></span><br><span class="line">Section Headers:</span><br><span class="line">  [Nr] Name              Type             Address           Offset</span><br><span class="line">       Size              EntSize          Flags  Link  Info  Align</span><br><span class="line">  [ 0]                   NULL             0000000000000000  00000000</span><br><span class="line">       0000000000000000  0000000000000000           0     0     0</span><br><span class="line">  [ 1] .interp           PROGBITS         0000000000000318  00000318</span><br><span class="line">       000000000000001c  0000000000000000   A       0     0     1</span><br><span class="line">  [ 2] .note.gnu.pr[...] NOTE             0000000000000338  00000338</span><br><span class="line">       0000000000000030  0000000000000000   A       0     0     8</span><br><span class="line">  [ 3] .note.gnu.bu[...] NOTE             0000000000000368  00000368</span><br><span class="line">       0000000000000024  0000000000000000   A       0     0     4</span><br><span class="line">  [ 4] .note.ABI-tag     NOTE             000000000000038c  0000038c</span><br><span class="line">       0000000000000020  0000000000000000   A       0     0     4</span><br><span class="line">  [ 5] .gnu.hash         GNU_HASH         00000000000003b0  000003b0</span><br><span class="line">       0000000000000028  0000000000000000   A       6     0     8</span><br><span class="line">  [ 6] .dynsym           DYNSYM           00000000000003d8  000003d8</span><br><span class="line">       0000000000000180  0000000000000018   A       7     1     8</span><br><span class="line">  [ 7] .dynstr           STRTAB           0000000000000558  00000558</span><br><span class="line">       000000000000019b  0000000000000000   A       0     0     1</span><br><span class="line">  [ 8] .gnu.version      VERSYM           00000000000006f4  000006f4</span><br><span class="line">       0000000000000020  0000000000000002   A       6     0     2</span><br><span class="line">  [ 9] .gnu.version_r    VERNEED          0000000000000718  00000718</span><br><span class="line">       0000000000000060  0000000000000000   A       7     2     8</span><br><span class="line">  [10] .rela.dyn         RELA             0000000000000778  00000778</span><br><span class="line">       0000000000000150  0000000000000018   A       6     0     8</span><br><span class="line">  [11] .rela.plt         RELA             00000000000008c8  000008c8</span><br><span class="line">       00000000000000a8  0000000000000018  AI       6    24     8</span><br><span class="line">  [12] .init             PROGBITS         0000000000001000  00001000</span><br><span class="line">       000000000000001b  0000000000000000  AX       0     0     4</span><br><span class="line">  [13] .plt              PROGBITS         0000000000001020  00001020</span><br><span class="line">       0000000000000080  0000000000000010  AX       0     0     16</span><br><span class="line">  [14] .plt.got          PROGBITS         00000000000010a0  000010a0</span><br><span class="line">       0000000000000010  0000000000000010  AX       0     0     16</span><br><span class="line">  [15] .plt.sec          PROGBITS         00000000000010b0  000010b0</span><br><span class="line">       0000000000000070  0000000000000010  AX       0     0     16</span><br><span class="line">  [16] .text             PROGBITS         0000000000001120  00001120</span><br><span class="line">       0000000000000385  0000000000000000  AX       0     0     16</span><br><span class="line">  [17] .fini             PROGBITS         00000000000014a8  000014a8</span><br><span class="line">       000000000000000d  0000000000000000  AX       0     0     4</span><br><span class="line">  [18] .rodata           PROGBITS         0000000000002000  00002000</span><br><span class="line">       000000000000003c  0000000000000000   A       0     0     4</span><br><span class="line">  [19] .eh_frame_hdr     PROGBITS         000000000000203c  0000203c</span><br><span class="line">       0000000000000044  0000000000000000   A       0     0     4</span><br><span class="line">  [20] .eh_frame         PROGBITS         0000000000002080  00002080</span><br><span class="line">       00000000000000ec  0000000000000000   A       0     0     8</span><br><span class="line">  [21] .init_array       INIT_ARRAY       0000000000003d60  00002d60</span><br><span class="line">       0000000000000010  0000000000000008  WA       0     0     8</span><br><span class="line">  [22] .fini_array       FINI_ARRAY       0000000000003d70  00002d70</span><br><span class="line">       0000000000000008  0000000000000008  WA       0     0     8</span><br><span class="line">  [23] .dynamic          DYNAMIC          0000000000003d78  00002d78</span><br><span class="line">       0000000000000200  0000000000000010  WA       7     0     8</span><br><span class="line">  [24] .got              PROGBITS         0000000000003f78  00002f78</span><br><span class="line">       0000000000000088  0000000000000008  WA       0     0     8</span><br><span class="line">  [25] .data             PROGBITS         0000000000004000  00003000</span><br><span class="line">       0000000000000020  0000000000000000  WA       0     0     8</span><br><span class="line">  [26] .bss              NOBITS           0000000000004040  00003020</span><br><span class="line">       0000000000000118  0000000000000000  WA       0     0     64</span><br><span class="line">  [27] .comment          PROGBITS         0000000000000000  00003020</span><br><span class="line">       000000000000002d  0000000000000001  MS       0     0     1</span><br><span class="line">  [28] .debug_aranges    PROGBITS         0000000000000000  0000304d</span><br><span class="line">       0000000000000030  0000000000000000           0     0     1</span><br><span class="line">  [29] .debug_info       PROGBITS         0000000000000000  0000307d</span><br><span class="line">       00000000000024b3  0000000000000000           0     0     1</span><br><span class="line">  [30] .debug_abbrev     PROGBITS         0000000000000000  00005530</span><br><span class="line">       00000000000005d0  0000000000000000           0     0     1</span><br><span class="line">  [31] .debug_line       PROGBITS         0000000000000000  00005b00</span><br><span class="line">       00000000000001ab  0000000000000000           0     0     1</span><br><span class="line">  [32] .debug_str        PROGBITS         0000000000000000  00005cab</span><br><span class="line">       0000000000001242  0000000000000001  MS       0     0     1</span><br><span class="line">  [33] .debug_line_str   PROGBITS         0000000000000000  00006eed</span><br><span class="line">       0000000000000289  0000000000000001  MS       0     0     1</span><br><span class="line">  [34] .symtab           SYMTAB           0000000000000000  00007178</span><br><span class="line">       00000000000004b0  0000000000000018          35    21     8</span><br><span class="line">  [35] .strtab           STRTAB           0000000000000000  00007628</span><br><span class="line">       0000000000000387  0000000000000000           0     0     1</span><br><span class="line">  [36] .shstrtab         STRTAB           0000000000000000  000079af</span><br><span class="line">       000000000000016a  0000000000000000           0     0     1</span><br><span class="line">Key to Flags:</span><br><span class="line">  W (write), A (alloc), X (execute), M (merge), S (strings), I (info),</span><br><span class="line">  L (link order), O (extra OS processing required), G (group), T (TLS),</span><br><span class="line">  C (compressed), x (unknown), o (OS specific), E (exclude),</span><br><span class="line">  D (mbind), l (large), p (processor specific)</span><br></pre></td></tr></table></figure>
 <h2 id="指针与引用">指针与引用</h2>
 <h3 id="右值引用">右值引用</h3>
 <h2 id="struct与class">struct与class</h2>
