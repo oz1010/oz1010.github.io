@@ -5982,34 +5982,61 @@ dump。</li>
         <category>Linux</category>
       </categories>
       <tags>
-        <tag>命令</tag>
         <tag>Shell</tag>
         <tag>脚本</tag>
+        <tag>命令</tag>
       </tags>
   </entry>
   <entry>
-    <title>编程语言-C++</title>
-    <url>/2024/04/04/%E7%BC%96%E7%A8%8B%E8%AF%AD%E8%A8%80-C/</url>
-    <content><![CDATA[<h2 id="告警">告警</h2>
-<h3 id="变量初始化顺序">变量初始化顺序</h3>
-<figure class="highlight sh"><table><tr><td class="code"><pre><span class="line">[build] /root/project/tcl3/aadl2c/include/AADL2C/AIT/CtxUtility.h: In constructor ‘AADL2C::AIT::CtxComponent::CtxComponent(AADL2C::AIT::NodeArchitecture&amp;, AADL2C::AIT::ASTBasePtr, AADL2C::AIT::NodeComponent&amp;)’:</span><br><span class="line">[build] /root/project/tcl3/aadl2c/include/AADL2C/AIT/CtxUtility.h:137:33: warning: ‘AADL2C::AIT::CtxComponent::mpnewInstance’ will be initialized after [-Wreorder]</span><br><span class="line">[build]      AADL2C::AIT::NodeComponent* mpnewInstance;</span><br><span class="line">[build]                                  ^~~~~~~~~~~~~</span><br><span class="line">[build] /root/project/tcl3/aadl2c/include/AADL2C/AIT/CtxUtility.h:136:33: warning:   ‘AADL2C::AIT::NodeComponent* AADL2C::AIT::CtxComponent::mpexistingInstance’ [-Wreorder]</span><br><span class="line">[build]      AADL2C::AIT::NodeComponent* mpexistingInstance;</span><br><span class="line">[build]                                  ^~~~~~~~~~~~~~~~~~</span><br><span class="line">[build] /root/project/tcl3/aadl2c/src/AIT/CtxUtility.cpp:49:1: warning:   when initialized here [-Wreorder]</span><br><span class="line">[build]  CtxComponent::CtxComponent(AADL2C::AIT::NodeArchitecture&amp; instanceRoot, ASTBasePtr component,</span><br><span class="line">[build]  ^~~~~~~~~~~~</span><br><span class="line">[build] In file included from /root/project/tcl3/aadl2c/src/AIT/CtxUtility.cpp:3:0:</span><br></pre></td></tr></table></figure>
-<p>这几句告警说的是变量顺序问题，英文大意为：</p>
-<blockquote>
-<p>成员变量<code>mpnewInstance</code>将会在<code>mpexistingInstance</code>之后初始化，当调用类构造函数<code>CtxComponent::CtxComponent</code>进行初始化时。</p>
-</blockquote>
-<p><strong>解决方案</strong>：调整相关变量初始化顺序</p>
-<h2 id="成员变量">成员变量</h2>
-<p>可见性：</p>
-<ul>
-<li>private</li>
-<li>protect</li>
-<li>public</li>
-</ul>
-<p>静态成员变量 static</p>
-<p>成员常量 const</p>
-<p>volitle?</p>
-<p>register?</p>
-<p>auto?</p>
+    <title>编程语言-Cpp</title>
+    <url>/2024/04/04/%E7%BC%96%E7%A8%8B%E8%AF%AD%E8%A8%80-Cpp/</url>
+    <content><![CDATA[<h1 id="基础知识">基础知识</h1>
+<h2 id="关键字">关键字</h2>
+<h3 id="static">static</h3>
+<h3 id="const">const</h3>
+<h3 id="extern">extern</h3>
+<h3 id="volatile">volatile</h3>
+<h3 id="register">register</h3>
+<h3 id="auto">auto</h3>
+<h3 id="virtual">virtual</h3>
+<h3 id="delete">delete</h3>
+<h3 id="default">default</h3>
+<h3 id="override">override</h3>
+<h3 id="final">final</h3>
+<h3 id="explict">explict</h3>
+<h3 id="friend">friend</h3>
+<h2 id="内存分布">内存分布</h2>
+<h3 id="全局区">全局区</h3>
+<h3 id="堆区">堆区</h3>
+<h3 id="栈区">栈区</h3>
+<h3 id="常量区">常量区</h3>
+<h3 id="代码区">代码区</h3>
+<h2 id="指针与引用">指针与引用</h2>
+<h3 id="右值引用">右值引用</h3>
+<h2 id="struct与class">struct与class</h2>
+<h3 id="struct内存分布">struct内存分布</h3>
+<h3 id="class内存分布">class内存分布</h3>
+<h2 id="sizeof与strlen">sizeof与strlen</h2>
+<h2 id="对象的三大特性">对象的三大特性</h2>
+<h3 id="封装">封装</h3>
+<h3 id="继承">继承</h3>
+<h3 id="多态">多态</h3>
+<h3 id="虚函数实现动态多态的原理">虚函数实现动态多态的原理</h3>
+<h3 id="虚函数与纯虚函数的区别">虚函数与纯虚函数的区别</h3>
+<h2 id="类的访问权限">类的访问权限</h2>
+<h3 id="private">private</h3>
+<h3 id="protected">protected</h3>
+<h3 id="public">public</h3>
+<h2 id="类的成员函数">类的成员函数</h2>
+<h3 id="构造函数">构造函数</h3>
+<h3 id="析构函数">析构函数</h3>
+<h3 id="赋值函数">赋值函数</h3>
+<h3 id="拷贝函数">拷贝函数</h3>
+<h3 id="移动构造函数">移动构造函数</h3>
+<h3 id="拷贝构造函数">拷贝构造函数</h3>
+<h3 id="深拷贝">深拷贝</h3>
+<h3 id="浅拷贝">浅拷贝</h3>
+<h2 id="类的运算符函数">类的运算符函数</h2>
 <h2 id="成员函数">成员函数</h2>
 <p>构造函数 析构函数 拷贝构造函数</p>
 <p>移动构造函数 移动赋值运算符</p>
@@ -6023,6 +6050,38 @@ dump。</li>
 <p>单参数构造函数显示转换 explict</p>
 <p>友元函数 friend</p>
 <h2 id="枚举">枚举</h2>
+<h2 id="类型转换">类型转换</h2>
+<h3 id="static_cast">static_cast</h3>
+<h3 id="dynamic_cast">dynamic_cast</h3>
+<h3 id="const_cast">const_cast</h3>
+<h3 id="reinterpret_cast">reinterpret_cast</h3>
+<h2 id="静态与多态">静态与多态</h2>
+<h3 id="重写">重写</h3>
+<h3 id="重载">重载</h3>
+<h3 id="模板">模板</h3>
+<h3 id="section"></h3>
+<h1 id="标准库">标准库</h1>
+<h2 id="std">std</h2>
+<h3 id="stdmove函数">std::move函数</h3>
+<h2 id="智能指针">智能指针</h2>
+<h3 id="auto_ptr">auto_ptr</h3>
+<h3 id="unique_ptr">unique_ptr</h3>
+<h3 id="shared_ptr">shared_ptr</h3>
+<h3 id="weak_ptr">weak_ptr</h3>
+<h2 id="stl容器">STL容器</h2>
+<h3 id="迭代器">迭代器</h3>
+<h4 id="迭代器原理">迭代器原理</h4>
+<h4 id="迭代器失效">迭代器失效</h4>
+<h3 id="vector">vector</h3>
+<h3 id="list">list</h3>
+<h3 id="map">map</h3>
+<h3 id="set">set</h3>
+<h3 id="map与unordered_map">map与unordered_map</h3>
+<h3 id="set与unordered_set">set与unordered_set</h3>
+<h3 id="vector与list">vector与list</h3>
+<h3 id="容器空间配置器">容器空间配置器</h3>
+<h1 id="编写技巧">编写技巧</h1>
+<h2 id="预处理宏自动生成">预处理宏自动生成</h2>
 <h3 id="字符串化">字符串化</h3>
 <p>C语言宏定义可以有一些特殊用法：</p>
 <ul>
@@ -6042,7 +6101,24 @@ dump。</li>
 <li>定义宏函数<code>ENUM_OR_STRING</code>，实现获取枚举字符串方法</li>
 </ol>
 <figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">ifdef</span> ENUM_OR_STRING</span></span><br><span class="line"><span class="meta">#<span class="keyword">undef</span> ENUM_OR_STRING</span></span><br><span class="line"><span class="meta">#<span class="keyword">endif</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> ENUM_OR_STRING(x) #x</span></span><br><span class="line"></span><br><span class="line"><span class="type">const</span> <span class="type">int</span> MAX_LENGTH_MSG = <span class="number">50</span>;</span><br><span class="line"><span class="type">const</span> <span class="type">char</span> msgIdString[][MAX_LENGTH_MSG] = &#123;</span><br><span class="line">    <span class="meta">#<span class="keyword">include</span> <span class="string">&quot;signal_list.gen&quot;</span></span></span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="type">const</span> <span class="type">char</span> *<span class="title function_">GetMsgName</span><span class="params">(<span class="type">int</span> msgID)</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="keyword">return</span> msgIdString[msgID];</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h1 id="常见问题">常见问题</h1>
+<h2 id="变量初始化顺序">变量初始化顺序</h2>
+<figure class="highlight sh"><table><tr><td class="code"><pre><span class="line">[build] /root/project/prj3/xxxx2c/include/MODE2C/DEV/CtxUtility.h: In constructor ‘MODE2C::DEV::CtxComponent::CtxComponent(MODE2C::DEV::NodeArchitecture&amp;, MODE2C::DEV::ASTBasePtr, MODE2C::DEV::NodeComponent&amp;)’:</span><br><span class="line">[build] /root/project/prj3/xxxx2c/include/MODE2C/DEV/CtxUtility.h:137:33: warning: ‘MODE2C::DEV::CtxComponent::mpnewInstance’ will be initialized after [-Wreorder]</span><br><span class="line">[build]      MODE2C::DEV::NodeComponent* mpnewInstance;</span><br><span class="line">[build]                                  ^~~~~~~~~~~~~</span><br><span class="line">[build] /root/project/prj3/xxxx2c/include/MODE2C/DEV/CtxUtility.h:136:33: warning:   ‘MODE2C::DEV::NodeComponent* MODE2C::DEV::CtxComponent::mpexistingInstance’ [-Wreorder]</span><br><span class="line">[build]      MODE2C::DEV::NodeComponent* mpexistingInstance;</span><br><span class="line">[build]                                  ^~~~~~~~~~~~~~~~~~</span><br><span class="line">[build] /root/project/prj3/xxxx2c/src/DEV/CtxUtility.cpp:49:1: warning:   when initialized here [-Wreorder]</span><br><span class="line">[build]  CtxComponent::CtxComponent(MODE2C::DEV::NodeArchitecture&amp; instanceRoot, ASTBasePtr component,</span><br><span class="line">[build]  ^~~~~~~~~~~~</span><br><span class="line">[build] In file included from /root/project/prj3/xxxx2c/src/DEV/CtxUtility.cpp:3:0:</span><br></pre></td></tr></table></figure>
+<p>这几句告警说的是变量顺序问题，英文大意为：</p>
+<blockquote>
+<p>成员变量<code>mpnewInstance</code>将会在<code>mpexistingInstance</code>之后初始化，当调用类构造函数<code>CtxComponent::CtxComponent</code>进行初始化时。</p>
+</blockquote>
+<p><strong>解决方案</strong>：调整相关变量初始化顺序</p>
 ]]></content>
+      <categories>
+        <category>编程语言</category>
+        <category>Cpp</category>
+      </categories>
+      <tags>
+        <tag>编程语言</tag>
+        <tag>Cpp</tag>
+        <tag>C++</tag>
+      </tags>
   </entry>
   <entry>
     <title>Makefile使用简介</title>
@@ -7053,6 +7129,10 @@ upper bound) flag</strong> 1位，不同段描述符不同功能</p>
 <p><a href="https://www.haskell.org/">官方主页</a></p>
 <p><a href="https://www.w3cschool.cn/hsriti/r6w1aozt.html">网上教程</a></p>
 ]]></content>
+      <categories>
+        <category>编程语言</category>
+        <category>Haskell</category>
+      </categories>
   </entry>
   <entry>
     <title>Shell脚本基础</title>
@@ -7807,6 +7887,10 @@ Man ​ 原型链 ​ 原型对象会指向父级? ​ 顶级对象是Object ​
 当访问属性或方法时，优先查找本地，没有再到父级中查找，直到为null ​
 instanceof</p>
 ]]></content>
+      <categories>
+        <category>编程语言</category>
+        <category>JavaScript</category>
+      </categories>
   </entry>
   <entry>
     <title>CentOS7使用</title>
