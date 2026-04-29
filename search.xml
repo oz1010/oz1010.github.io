@@ -60,6 +60,11 @@ VS Code 的体验)</li>
 可以看到当前文件的所有类、变量和函数列表，支持实时搜索。</li>
 </ol>
 <h1 id="使用说明">使用说明</h1>
+<p>参考文档：<a href="https://yannesposito.com/Scratch/en/blog/Learn-Vim-Progressively/">YBlog
+- Learn Vim Progressively</a></p>
+<p>全命令列表见：<a href="https://vim.rtorr.com/lang/zh_cn">Vim Cheat
+Sheet</a></p>
+<p>自带的教程：vimtutor</p>
 <h2 id="模式说明">模式说明</h2>
 <p>vim存在三种模式应对不同的编辑需求：普通模式、插入模式、视图模式。打开vim程序默认会进入普通模式，输入<code>i</code>能够切换到插入模式。在插入模式中可以输入任何字符。任何模式中，通过输入<code>ESC</code>返回普通模式。</p>
 <h3 id="普通模式">普通模式</h3>
@@ -110,6 +115,16 @@ VS Code 的体验)</li>
 跳转到行<code>&lt;number&gt;</code></li>
 <li><code>gg</code> 等效于命令<code>1G</code>，跳转到第一行</li>
 <li><code>G</code> 跳转到最后一行</li>
+<li><code>&lt;action&gt;a&lt;object&gt;</code> 或
+<code>&lt;action&gt;i&lt;object&gt;</code>
+区域操作。<code>&lt;action&gt;</code>支持很多动作，比如：<code>d</code>删除,
+<code>y</code>复制,
+<code>v</code>视图模式选择。<code>&lt;object&gt;</code>支持很多目标，比如：<code>w</code>词,
+<code>s</code>句子,
+<code>p</code>段落。也支持自然符号，比如：<code>"</code>,
+<code>'</code>, <code>(</code> , <code>[</code>, <code>&#123;</code>。</li>
+<li><code>&lt;&lt;/&gt;&gt;</code> 减少/增加 行缩进</li>
+<li><code>==</code> 行自动缩进</li>
 </ul>
 <h4 id="命令列表">命令列表</h4>
 <ul>
@@ -119,6 +134,18 @@ VS Code 的体验)</li>
 <li><code>:help &lt;command&gt;</code>
 显示关于<code>&lt;command&gt;</code>的帮助信息</li>
 </ul>
+<h4 id="区域操作">区域操作</h4>
+<p>当光标在字符串(map (+) (“foo”))的第一个o字符。</p>
+<ul>
+<li><code>vi"</code> → 会选择<code>foo</code></li>
+<li><code>va"</code> → 会选择 <code>"foo"</code>.</li>
+<li><code>vi)</code> → 会选择 <code>"foo"</code>.</li>
+<li><code>va)</code> → 会选择<code>("foo")</code></li>
+<li><code>v2i)</code> → 会选择 <code>map (+) ("foo")</code></li>
+<li><code>v2a)</code> → 会选择 <code>(map (+) ("foo"))</code></li>
+</ul>
+<p>示例如下</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">           ---    vi&quot;</span><br><span class="line">          +++++   va&quot; or vi)</span><br><span class="line">         =======  va) </span><br><span class="line">(map (+) (&quot;foo&quot;))</span><br><span class="line">----------------- v2a)</span><br><span class="line"> ~~~~~~~~~~~~~~~  v2i)</span><br></pre></td></tr></table></figure>
 <h4 id="示例">示例</h4>
 <p><code>2dd</code> 将会删除2行</p>
 <p><code>3p</code> 将会粘贴缓冲区的内容3次</p>
