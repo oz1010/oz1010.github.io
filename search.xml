@@ -3,7 +3,8 @@
   <entry>
     <title>常用工具-Vim简介</title>
     <url>/2026/04/14/%E5%B8%B8%E7%94%A8%E5%B7%A5%E5%85%B7-Vim%E7%AE%80%E4%BB%8B/</url>
-    <content><![CDATA[<h2 id="核心架构选择">核心架构选择</h2>
+    <content><![CDATA[<h1 id="工具安装">工具安装</h1>
+<h2 id="核心架构选择">核心架构选择</h2>
 <p>目前最主流、性能最强的组合是：</p>
 <ul>
 <li><strong>插件管理器</strong>: <code>vim-plug</code> (轻量、易用)</li>
@@ -58,6 +59,75 @@ VS Code 的体验)</li>
 <li><strong>符号大纲</strong>: 输入 <code>:CocList outline</code>
 可以看到当前文件的所有类、变量和函数列表，支持实时搜索。</li>
 </ol>
+<h1 id="使用说明">使用说明</h1>
+<h2 id="模式说明">模式说明</h2>
+<p>vim存在三种模式应对不同的编辑需求：普通模式、插入模式、视图模式。打开vim程序默认会进入普通模式，输入<code>i</code>能够切换到插入模式。在插入模式中可以输入任何字符。任何模式中，通过输入<code>ESC</code>返回普通模式。</p>
+<h3 id="普通模式">普通模式</h3>
+<p>字符对应英文的字母，中文的字。以下很多命令可以相互组合。</p>
+<ul>
+<li><code>i/a</code> 切换到插入模式，光标位置移到 字符首/字符尾。</li>
+<li><code>I/A</code> 切换到插入模式，光标位置移到 行首/行尾。</li>
+<li><code>h/l</code> 光标位置 向左/向右 移动1字符。</li>
+<li><code>j/k</code> 光标位置 向下/向上 移动1行。</li>
+<li><code>w/W</code> 光标移到下一词开始处，大写为词可以包含分隔符</li>
+<li><code>e/E</code>
+光标移到当前词或下一个词结尾处，大写为词可以包含分隔符</li>
+<li><code>b/B</code>
+光标移到当前词或下一个词开头处，大写为词可以包含分隔符</li>
+<li><code>0/$</code> 光标移到 行首/行尾</li>
+<li><code>^/g_</code> 光标移到当前行 第一个/最后一个 字符</li>
+<li><code>f/F&lt;char&gt;</code> 向后/向前
+查找字符<code>&lt;char&gt;</code>，查找过程中，通过<code>;/,</code>将光标移到
+下/上 一项匹配项。</li>
+<li><code>t/T&lt;char&gt;</code> 向后/向前
+查找字符<code>&lt;char&gt;</code>，查找过程中，通过<code>;/,</code>将光标移到
+下/上 一项匹配项。</li>
+<li><code>d&lt;command&gt;</code> 删除光标下的字符，并复制到缓冲区</li>
+<li><code>y&lt;command&gt;</code> 复制光标下的字符缓冲区</li>
+<li><code>dd</code> 删除当前行的内容，并复制到缓冲区</li>
+<li><code>yy</code> 复制当前行的内容到缓冲区</li>
+<li><code>x</code> 删除光标下的1个字符，并复制到缓冲区</li>
+<li><code>p/P</code> 在当前行 后面/前面 粘贴缓冲区的内容</li>
+<li><code>:&lt;command&gt;</code>
+执行命令<code>&lt;command&gt;</code></li>
+<li><code>/&lt;string&gt;</code>
+搜索字符串<code>&lt;string&gt;</code>，搜索过程中，通过<code>n/N</code>将光标移到
+下/上 一项匹配项。</li>
+<li><code>%</code>
+光标跳转到匹配括号位置处，包括<code>( [ &#123;</code>。若光标不在括号处，则向后查找到第一个括号为匹配对象，然后跳转到匹配括号位置处。</li>
+<li><code>*</code>
+词搜索。若光标在词<code>&lt;word&gt;</code>内，则等同命令<code>/&lt;word&gt;</code>。否则，向后查找到第一个词为搜索对象。</li>
+<li><code>J</code>
+合并当前行和下一行，合并时会删除下一行多余的缩进并使用1个空格符作为分隔符。</li>
+<li><code>gJ</code>
+是<code>J</code>的变体，合并时保留下一行的所有内容。</li>
+<li><code>.</code> 重复上一个命令</li>
+<li><code>&lt;number&gt;&lt;commands&gt;</code>
+重复执行<code>&lt;commands&gt;</code>命令列表<code>&lt;number&gt;</code>次</li>
+<li><code>u</code> 撤销</li>
+<li><code>&lt;Ctrl+r&gt;</code> 重做</li>
+<li><code>&lt;number&gt;G</code>
+跳转到行<code>&lt;number&gt;</code></li>
+<li><code>gg</code> 等效于命令<code>1G</code>，跳转到第一行</li>
+<li><code>G</code> 跳转到最后一行</li>
+</ul>
+<h4 id="命令列表">命令列表</h4>
+<ul>
+<li><code>:wq</code> 保存并退出</li>
+<li><code>:w</code> 保存</li>
+<li><code>:q!</code> 不保存并退出</li>
+<li><code>:help &lt;command&gt;</code>
+显示关于<code>&lt;command&gt;</code>的帮助信息</li>
+</ul>
+<h4 id="示例">示例</h4>
+<p><code>2dd</code> 将会删除2行</p>
+<p><code>3p</code> 将会粘贴缓冲区的内容3次</p>
+<p><code>10idesu &lt;ESC&gt;</code> 将会插入”desu desu desu desu desu
+desu desu desu desu desu ”</p>
+<p><code>.</code> 执行上一次命令<code>10idesu &lt;ESC&gt;</code></p>
+<p><code>3.</code>
+执行上一次命令<code>idesu &lt;ESC&gt;</code>3次，而不是300次。</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line"># </span><br><span class="line">将会再</span><br></pre></td></tr></table></figure>
 <h1 id="技巧1">技巧1</h1>
 <h3 id="leader键改为空格">leader键改为空格</h3>
 <figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">let mapleader = &quot;\&lt;Space&gt;&quot;</span><br></pre></td></tr></table></figure>
