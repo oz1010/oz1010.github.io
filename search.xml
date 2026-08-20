@@ -8942,6 +8942,11 @@ LUT</a> ，扫描码到ASCII码的转换表格请读者自己生成。</p>
 <li>其他：命令执行失败</li>
 </ul>
 <figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">$ timeout 6 mkdir -p /mnt/dev0</span><br></pre></td></tr></table></figure>
+<h3 id="sshfs挂载路径">sshfs挂载路径</h3>
+<p>将远端服务器路径挂载到本地</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">$ sshfs -o _netdev,reconnect,allow_other,default_permissions root@xx.xx.xx.xx:/root /share</span><br></pre></td></tr></table></figure>
+<p>编写一个<code>/etc/systemd/system/xxx.mount</code>的服务，可以通过systemctl管理，enable后能够随WSL系统启动，完成自动挂载。xxx需要与挂载文件夹路径一致，‘/’使用’-’替代。<code>/etc/systemd/system/share-root.mount</code>表示将文件夹挂载到<code>/share/root</code>中，否则启动时会报错。</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">[Unit]</span><br><span class="line">Description=SSHFS Mount root</span><br><span class="line">After=network-online.target</span><br><span class="line">Wants=network-online.target</span><br><span class="line"></span><br><span class="line">[Mount]</span><br><span class="line">What=root@xx.xx.xx.xx:/root</span><br><span class="line">Where=/share/root</span><br><span class="line">Type=fuse.sshfs</span><br><span class="line">Options=_netdev,reconnect,IdentityFile=/root/.ssh/id_xxx,allow_other,default_permissions</span><br><span class="line"></span><br><span class="line">[Install]</span><br><span class="line">WantedBy=multi-user.target</span><br><span class="line"></span><br></pre></td></tr></table></figure>
 <h1 id="脚本编写">脚本编写</h1>
 <p>细节介绍参考<code>man bash</code></p>
 <h2 id="基本语法">基本语法</h2>
