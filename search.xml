@@ -562,58 +562,23 @@ Bring-up：用最小配置建立基线，用寄存器和 DMA
       </tags>
   </entry>
   <entry>
-    <title>Linux驱动-DWC3驱动技术总结</title>
+    <title>Linux驱动-DWC3驱动指南</title>
     <url>/2026/11/11/Linux%E9%A9%B1%E5%8A%A8-DWC3%E9%A9%B1%E5%8A%A8%E6%8A%80%E6%9C%AF%E6%80%BB%E7%BB%93/</url>
-    <content><![CDATA[<h1 id="项目能力的总体概括">1. 项目能力的总体概括</h1>
-<p>这项工作不是单独写一个 USB
-外设驱动，而是围绕一套多核异构平台，打通以下几条链路：</p>
-<ol type="1">
-<li><strong>Linux Host 链路</strong>：DWC3/xHCI 控制器初始化为
-Host，支持 SuperSpeed Plus 存储设备热插拔，经
-usbcore、UAS、SCSI、块层和文件系统最终生成块设备。</li>
-<li><strong>Linux Device 链路</strong>：通过 Gadget
-Function、Composite/configfs 和 UDC 提供 ADB、模拟磁盘等功能，并支持
-Host/Device 角色切换。</li>
-<li><strong>跨域虚拟 USB 链路</strong>：实时安全域管理物理 USB Device
-控制器，Linux 域通过虚拟 USB 驱动、dummy HCD/UDC
-和跨核消息机制转发数据，使多个软件域复用同一个物理 USB 接口。</li>
-<li><strong>可靠性与可维护性</strong>：覆盖 Type-C 方向与 lane
-切换、runtime
-PM、STR、端口/控制器恢复、动态日志、tracepoint、usbmon、TRB dump 和 JTAG
-内核调试。</li>
-</ol>
-<p>面试时可以用下面这段作为 90 秒项目介绍，但应按实际职责删减：</p>
-<blockquote>
-<p>我参与的 USB 工作同时包含 Host、Gadget 和跨域虚拟化三部分。Host
-侧，我围绕 DWC3/xHCI 梳理了从端口状态变化、hub 枚举、Interface
-驱动绑定，到 UAS/SCSI 和块设备创建的完整链路，并通过 dynamic
-debug、usbmon、xHCI debugfs 和 TRB 分析定位速率、枚举和传输问题。Device
-侧涉及 Gadget Function、UDC、configfs，以及 Type-C 方向和 Host/Device
-角色切换。比较特殊的是，物理 Device 控制器由实时安全域管理，Linux 侧通过
-dummy HCD/UDC、虚拟 USB
-驱动和跨核消息通道复用该端口。这里最难的不是把数据搬过去，而是处理 USB
-传输、上层消息边界、聚合发送、零长包、反压和断开时的资源回收。我也建立了从日志、抓包到
-JTAG 的分层调试方法，避免问题出现时只围绕单一驱动盲目修改。</p>
-</blockquote>
-<hr>
-<h1 id="先建立正确的全局架构">2. 先建立正确的全局架构</h1>
-<h2 id="host-与-device-是两条不同的软件栈">2.1 Host 与 Device
-是两条不同的软件栈</h2>
-<figure class="highlight text"><table><tr><td class="code"><pre><span class="line">USB Device 侧                                      USB Host 侧</span><br><span class="line"></span><br><span class="line">应用 / ADB / Mass Storage Function                 应用 / 文件系统</span><br><span class="line">        |                                                 |</span><br><span class="line">Gadget Function 驱动                              块层 / SCSI / HID 等类驱动</span><br><span class="line">        |                                                 |</span><br><span class="line">Gadget Function API / Composite / configfs         usbcore：设备、接口、配置、URB</span><br><span class="line">        |                                                 |</span><br><span class="line">UDC 驱动                                           HCD：xHCI/EHCI/OHCI/UHCI</span><br><span class="line">        |                                                 |</span><br><span class="line">USB Device Controller 硬件  &lt;---- USB 链路 ----&gt;   USB Host Controller 硬件</span><br></pre></td></tr></table></figure>
-<p>关键点：</p>
+    <content><![CDATA[<h1 id="usb-基本概念">1 USB 基本概念</h1>
+<p>以 Linux 6.1/6.6 系列的通用实现为参考，覆盖 DWC3
+主机、设备及双角色场景。平台专用代码统一抽象为 SoC
+适配层；函数、配置项和调试节点以目标内核源码为准。文中命令用于实验环境，不代表已在目标硬件验证。</p>
+<h2 id="角色接口与速率">1.1 角色、接口与速率</h2>
 <ul>
-<li>Host 侧的核心抽象是
-<code>usb_device</code>、<code>usb_interface</code>、URB 和 HCD。</li>
-<li>Device 侧的核心抽象是 Gadget Function、USB request 和 UDC。</li>
-<li>DWC3 是可支持双角色的控制器 IP；xHCI 是 Host
-控制器接口规范。二者不能简单视为同一层概念。</li>
-<li>同一个物理控制器从 Host 切到
-Device，不是修改一个字符串就结束，而是涉及原角色驱动退出、端点和 PHY
-状态清理、新角色驱动初始化及上层服务重建。</li>
+<li><strong>Host</strong>：发起总线事务，负责设备枚举、地址管理和传输调度。</li>
+<li><strong>Device/Peripheral</strong>：响应 Host
+请求，通过端点提供功能；Linux 设备侧软件框架称为 Gadget。</li>
+<li><strong>Hub</strong>：扩展端口并报告端口状态；Root Hub
+是主机控制器向 usbcore 呈现的逻辑根集线器。</li>
+<li><strong>DRD</strong>：Dual-Role Device，控制器可在 Host 与 Device
+之间切换，不表示同一控制器可同时运行两种角色。</li>
+<li><strong>PHY</strong>：完成电气收发及相关链路功能；控制器驱动负责协议、DMA、端点和事件处理。</li>
 </ul>
-<h2 id="usb-存储的完整层次">2.2 USB 存储的完整层次</h2>
-<figure class="highlight text"><table><tr><td class="code"><pre><span class="line">应用 read/write/mount</span><br><span class="line">        |</span><br><span class="line">文件系统（如 ext4）</span><br><span class="line">        |</span><br><span class="line">通用块层 / 块设备节点</span><br><span class="line">        |</span><br><span class="line">sd_mod：SCSI Disk</span><br><span class="line">        |</span><br><span class="line">SCSI Core：扫描 target/LUN、命令调度、错误处理</span><br><span class="line">        |</span><br><span class="line">UAS 或 usb-storage(BOT)</span><br><span class="line">        |</span><br><span class="line">usbcore：配置、Interface 绑定、URB 管理</span><br><span class="line">        |</span><br><span class="line">xHCI HCD：Transfer/Command/Event Ring、TRB、IRQ</span><br><span class="line">        |</span><br><span class="line">DWC3/xHCI 控制器与 PHY</span><br></pre></td></tr></table></figure>
-<p>BOT 与 UAS 的区别是常见追问：</p>
 <table>
 <colgroup>
 <col style="width: 33%">
@@ -622,48 +587,563 @@ Device，不是修改一个字符串就结束，而是涉及原角色驱动退�
 </colgroup>
 <thead>
 <tr class="header">
-<th>维度</th>
-<th>BOT（<code>usb-storage</code>）</th>
-<th>UAS</th>
+<th>常用名称</th>
+<th>标称链路速率</th>
+<th>工程含义</th>
 </tr>
 </thead>
 <tbody>
 <tr class="odd">
-<td>基本模型</td>
-<td>CBW、Data、CSW，命令流相对串行</td>
-<td>Command/Status/Data IU，可并发执行命令</td>
+<td>Low Speed，LS</td>
+<td>1.5 Mbit/s</td>
+<td>常见于低带宽输入设备</td>
 </tr>
 <tr class="even">
-<td>USB 3.x Streams</td>
-<td>不使用</td>
-<td>可利用 Streams 对应命令队列</td>
+<td>Full Speed，FS</td>
+<td>12 Mbit/s</td>
+<td>USB 2.0 体系支持的速率之一</td>
 </tr>
 <tr class="odd">
-<td>性能特征</td>
-<td>协议简单、兼容广，但并发能力弱</td>
-<td>更适合高队列深度和高性能存储</td>
+<td>High Speed，HS</td>
+<td>480 Mbit/s</td>
+<td>USB 2.0 高速模式</td>
 </tr>
 <tr class="even">
-<td>内核衔接</td>
-<td>注册 SCSI Host</td>
-<td>同样注册 SCSI Host</td>
+<td>SuperSpeed，SS</td>
+<td>5 Gbit/s</td>
+<td>常见于 USB 3.x Gen 1 单通道</td>
 </tr>
 <tr class="odd">
-<td>上层差异</td>
-<td>对 SCSI/块层透明</td>
-<td>对 SCSI/块层透明</td>
+<td>SuperSpeedPlus，SSP</td>
+<td>10 Gbit/s 及以上组合</td>
+<td>具体能力由代际、单通道速率和通道数共同决定</td>
 </tr>
 </tbody>
 </table>
-<p>因此，“生成 <code>/dev/sdX</code>”并不是 USB 驱动单独完成的，而是
-UAS/BOT、SCSI 扫描和 <code>sd_probe</code> 共同完成的结果。</p>
-<h2 id="跨域虚拟-usb-的真实架构">2.3 跨域虚拟 USB 的真实架构</h2>
-<figure class="highlight text"><table><tr><td class="code"><pre><span class="line">Linux 域                         实时安全域                     PC</span><br><span class="line">+----------------------+        +----------------------+     +------------+</span><br><span class="line">| ADB / TTY            |        | 跨域代理              |     | USB 驱动   |</span><br><span class="line">|        |             |        |       |              |     |     |      |</span><br><span class="line">| Gadget Function      |        | 物理 UDC 驱动         | &lt;== | USB HCD    |</span><br><span class="line">|        |             |        +----------^-----------+     +------------+</span><br><span class="line">| dummy UDC/HCD        |                   |</span><br><span class="line">|        |             |                   |</span><br><span class="line">| 虚拟 USB Host 驱动   |                   |</span><br><span class="line">| RX/TX 线程、队列     | === 跨核消息 ===&gt; |</span><br><span class="line">+----------------------+</span><br></pre></td></tr></table></figure>
-<p>该结构的价值是：<strong>物理 USB
-端口只由一个域直接控制，其他域通过虚拟化方式复用</strong>。代价是增加了协议边界保持、跨域流控、缓存生命周期、异常恢复和性能调优的复杂度。</p>
-<hr>
-<h1 id="核心对象与传输机制">3. 核心对象与传输机制</h1>
-<h2 id="必须能讲清楚的结构体">3.1 必须能讲清楚的结构体</h2>
+<p>链路速率不等于有效吞吐。连接器形态、控制器能力、PHY、线缆、Hub
+和外设共同决定实际协商结果；Type-C 接口不保证支持 SuperSpeed
+或特定供电功率。</p>
+<h2 id="设备模型与描述符">1.2 设备模型与描述符</h2>
+<p>USB 的逻辑层次为：</p>
+<figure class="highlight text"><table><tr><td class="code"><pre><span class="line">Device</span><br><span class="line">└─ Configuration：选择一组功能和功耗配置</span><br><span class="line">   └─ Interface：独立功能，通常是 Linux USB 功能驱动的绑定单位</span><br><span class="line">      └─ Alternate Setting：同一接口的可选端点配置</span><br><span class="line">         └─ Endpoint：数据传输入口或出口</span><br></pre></td></tr></table></figure>
+<ul>
+<li>设备可提供多个 Configuration，但同一时刻通常只激活一个；一个
+Configuration 可同时包含多个 Interface。</li>
+<li>EP0
+是默认控制端点，用于标准请求、类请求或厂商请求，不属于某个接口的普通数据端点。</li>
+<li>端点地址包含编号和方向。<strong>IN/OUT 始终以 Host
+为参照</strong>：IN 为设备到主机，OUT 为主机到设备。</li>
+<li>Pipe 是 Host
+侧的软件访问抽象，编码目标地址、端点、方向和传输类型，不是另一类硬件端点。</li>
+<li>BOS 及 SuperSpeed Endpoint Companion
+等描述符补充设备能力、突发和流等信息，不能仅依据设备版本字段判断运行速率。</li>
+</ul>
+<h2 id="四类传输">1.3 四类传输</h2>
+<table>
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>类型</th>
+<th>特性</th>
+<th>典型用途</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Control</td>
+<td>包含 Setup、可选 Data 和 Status 阶段</td>
+<td>枚举、配置和控制命令</td>
+</tr>
+<tr class="even">
+<td>Bulk</td>
+<td>注重可靠性，使用可用带宽，无固定时延保证</td>
+<td>存储、ADB、大块数据</td>
+</tr>
+<tr class="odd">
+<td>Interrupt</td>
+<td>主机按服务间隔调度，不是外设直接触发 CPU 中断</td>
+<td>HID、状态通知</td>
+</tr>
+<tr class="even">
+<td>Isochronous</td>
+<td>周期性带宽和时序约束，不进行保证成功的事务重试</td>
+<td>音视频实时流</td>
+</tr>
+</tbody>
+</table>
+<p>必须区分：USB 数据包、一次 USB 传输、URB、硬件 TRB
+和应用协议消息。它们之间通常不是一一对应关系。</p>
+<h2 id="短包零长包与-type-c">1.4 短包、零长包与 Type-C</h2>
+<ul>
+<li><strong>短包</strong>：有效载荷小于端点最大包长的包；对常见 Bulk IN
+接收而言，可使尚未填满的请求提前结束。</li>
+<li><strong>ZLP</strong>：零长度数据包，是短包的特殊形式。是否需要发送取决于传输长度、接收请求和上层协议约定，不能对所有整包长传输无条件添加。</li>
+<li><strong>CC/PD</strong>：CC 参与连接、方向及角色检测；USB PD
+处理电源协商及相关角色交换。USB 数据角色与供电角色是不同维度。</li>
+<li><strong>方向切换</strong>：Type-C 正反插可能需要切换 SuperSpeed
+信号路径，由 Type-C switch/mux、PHY 等协作完成，不等同于 Host/Device
+角色切换。</li>
+</ul>
+<h1 id="linux-usb-驱动结构">2 Linux USB 驱动结构</h1>
+<h2 id="host-侧分层">2.1 Host 侧分层</h2>
+<p>以 USB 存储为例：</p>
+<figure class="highlight text"><table><tr><td class="code"><pre><span class="line">应用程序</span><br><span class="line">  → VFS / 文件系统</span><br><span class="line">  → 块层 / SCSI 中间层 / sd</span><br><span class="line">  → uas 或 usb-storage</span><br><span class="line">  → usbcore：设备、接口、Hub、URB、电源管理</span><br><span class="line">  → HCD：xhci-hcd 等</span><br><span class="line">  → 主机控制器 / PHY / USB 外设</span><br></pre></td></tr></table></figure>
+<p>usbcore 负责枚举和通用设备管理；HCD 将 URB
+转为控制器可执行的请求。UAS/BOT 属于存储传输协议，不是 DWC3 或 xHCI
+的工作模式。</p>
+<table>
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>主机控制器接口</th>
+<th>常见支持范围</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>UHCI / OHCI</td>
+<td>LS、FS</td>
+<td>早期主机控制器接口</td>
+</tr>
+<tr class="even">
+<td>EHCI</td>
+<td>HS 为主</td>
+<td>LS/FS 通常经高速 Hub 的 TT 或伴随控制器处理</td>
+</tr>
+<tr class="odd">
+<td>xHCI</td>
+<td>LS、FS、HS、SS/SSP，取决于实现</td>
+<td>同一 xHCI 可管理 USB 2.0 和 USB 3.x 设备</td>
+</tr>
+</tbody>
+</table>
+<p>不能因外设以 HS 连接就判断系统使用 EHCI。DWC3 在 Host 模式下通常由
+xHCI 驱动承接主机传输。</p>
+<h2 id="gadget-侧分层">2.2 Gadget 侧分层</h2>
+<figure class="highlight text"><table><tr><td class="code"><pre><span class="line">应用程序 / FunctionFS 用户态服务</span><br><span class="line">  → Gadget Function：串口、网络、存储、FunctionFS 等</span><br><span class="line">  → Composite Framework / configfs</span><br><span class="line">  → UDC Core</span><br><span class="line">  → DWC3 Gadget 驱动</span><br><span class="line">  → 控制器 / PHY / 对端 Host</span><br></pre></td></tr></table></figure>
+<ul>
+<li><strong>UDC</strong>：USB Device
+Controller，设备侧控制器及其驱动抽象。</li>
+<li><strong>Function</strong>：实现具体 USB 功能；多个 Function
+可组成复合设备。</li>
+<li><strong>configfs</strong>：组织描述符、Configuration 和
+Function，最终绑定 UDC。</li>
+<li><strong>FunctionFS</strong>：将特定接口的端点 I/O
+和部分事件交给用户态；ADB 常使用此机制，但需要匹配的用户态服务，不是启用
+DWC3 就自动具备 ADB。</li>
+</ul>
+<h2 id="源码阅读入口">2.3 源码阅读入口</h2>
+<table>
+<colgroup>
+<col style="width: 50%">
+<col style="width: 50%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>路径</th>
+<th>重点</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>drivers/usb/core/</code></td>
+<td><code>hub.c</code> 枚举与端口事件，<code>driver.c</code> 匹配与
+PM，<code>urb.c</code> 请求管理，<code>message.c</code>
+消息封装，<code>hcd.c</code> HCD 公共逻辑</td>
+</tr>
+<tr class="even">
+<td><code>drivers/usb/host/</code></td>
+<td><code>xhci.c</code> 主机公共逻辑，<code>xhci-plat.c</code>
+平台接入，<code>xhci-ring.c</code> Ring 与事件，<code>xhci-mem.c</code>
+上下文及内存</td>
+</tr>
+<tr class="odd">
+<td><code>drivers/usb/dwc3/</code></td>
+<td>DWC3 Core、Host、Gadget、DRD、debugfs、trace 及 SoC Glue</td>
+</tr>
+<tr class="even">
+<td><code>drivers/usb/gadget/</code></td>
+<td>UDC Core、Composite、Function、configfs</td>
+</tr>
+<tr class="odd">
+<td><code>drivers/usb/roles/</code></td>
+<td>USB Role Switch 类框架</td>
+</tr>
+<tr class="even">
+<td><code>drivers/usb/typec/</code></td>
+<td>Type-C、端口管理及 switch/mux 支持</td>
+</tr>
+<tr class="odd">
+<td><code>drivers/phy/</code></td>
+<td>PHY 驱动与 SoC 电气适配</td>
+</tr>
+<tr class="even">
+<td><code>drivers/usb/storage/</code>、<code>drivers/scsi/</code></td>
+<td>BOT/UAS、SCSI 扫描和磁盘注册</td>
+</tr>
+<tr class="odd">
+<td><code>include/linux/usb*.h</code>、<code>include/linux/usb/</code></td>
+<td>USB 内核 API、HCD 和 Gadget 定义</td>
+</tr>
+<tr class="even">
+<td><code>include/uapi/linux/usb/</code></td>
+<td>标准 USB 请求与描述符格式，如
+<code>ch9.h</code>、<code>ch11.h</code></td>
+</tr>
+</tbody>
+</table>
+<p>SoC 专用的时钟、复位、电源域、互连和 PHY 配置应尽量留在 Glue/PHY
+层，避免复制整套 DWC3 或 Gadget 代码形成长期分叉。</p>
+<h1 id="关键协议数据结构">3 关键协议数据结构</h1>
+<h2 id="描述符与控制请求">3.1 描述符与控制请求</h2>
+<table>
+<colgroup>
+<col style="width: 50%">
+<col style="width: 50%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>结构</th>
+<th>关键字段或作用</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>struct usb_device_descriptor</code></td>
+<td><code>idVendor</code>、<code>idProduct</code>、<code>bcdUSB</code>、EP0
+最大包长、配置数量</td>
+</tr>
+<tr class="even">
+<td><code>struct usb_config_descriptor</code></td>
+<td>总长度、接口数量、配置值、供电属性</td>
+</tr>
+<tr class="odd">
+<td><code>struct usb_interface_descriptor</code></td>
+<td>接口号、Alternate Setting、端点数、类/子类/协议</td>
+</tr>
+<tr class="even">
+<td><code>struct usb_endpoint_descriptor</code></td>
+<td>端点地址、传输类型、最大包长、服务间隔</td>
+</tr>
+<tr class="odd">
+<td><code>struct usb_ss_ep_comp_descriptor</code></td>
+<td>SuperSpeed 端点突发、Streams 或周期传输能力</td>
+</tr>
+<tr class="even">
+<td><code>struct usb_ctrlrequest</code></td>
+<td>8 字节 Setup 数据：请求类型、请求码、值、索引、长度</td>
+</tr>
+</tbody>
+</table>
+<p>处理描述符时须验证长度、边界和类型；多字节协议字段按定义进行大小端转换。<code>bInterval</code>
+在不同速率和传输类型下编码不同，不应统一解释为毫秒。</p>
+<h2 id="存储与应用协议">3.2 存储与应用协议</h2>
+<ul>
+<li><strong>BOT</strong>：CBW → 可选数据阶段 → CSW；标准 CBW 为 31
+字节，CSW 为 13 字节。分析 INQUIRY 时，应区分 USB 包装、SCSI CDB
+和响应负载。</li>
+<li><strong>UAS</strong>：以 IU
+承载命令、状态和任务管理，支持更好的并发；实际使用还取决于接口描述符、主机能力、Streams
+支持及内核兼容性策略。</li>
+<li><strong>ADB</strong>：应用协议消息可跨越多个 USB
+请求；消息头、负载和 USB
+短包不是同一个边界。具体长度上限及流控行为由协议版本和实现决定。</li>
+</ul>
+<h1 id="内核数据结构与生命周期">4 内核数据结构与生命周期</h1>
+<h2 id="通用驱动模型与-host-对象">4.1 通用驱动模型与 Host 对象</h2>
+<table>
+<colgroup>
+<col style="width: 50%">
+<col style="width: 50%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>结构</th>
+<th>关键关系与职责</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>struct device</code> / <code>struct device_driver</code></td>
+<td>Linux 设备模型，提供层次、绑定、引用计数、DMA 和 PM 基础</td>
+</tr>
+<tr class="even">
+<td><code>struct platform_device</code> /
+<code>struct platform_driver</code></td>
+<td>描述并驱动片上控制器；通过固件匹配表关联资源与驱动</td>
+</tr>
+<tr class="odd">
+<td><code>struct usb_bus</code></td>
+<td>USB 逻辑总线，记录总线号、控制器及 Root Hub</td>
+</tr>
+<tr class="even">
+<td><code>struct usb_hcd</code></td>
+<td>HCD 实例，内嵌 <code>self</code> 总线对象，关联寄存器、IRQ 与
+<code>hc_driver</code></td>
+</tr>
+<tr class="odd">
+<td><code>struct hc_driver</code></td>
+<td>控制器操作表，如启动、停止、URB 入队/出队和 Root Hub 控制</td>
+</tr>
+<tr class="even">
+<td><code>struct usb_device</code></td>
+<td>物理或逻辑 USB 设备，关联父 Hub、总线、速率、描述符、配置和 EP0</td>
+</tr>
+<tr class="odd">
+<td><code>struct usb_interface</code></td>
+<td>当前配置中的接口，通常由 <code>struct usb_driver</code> 绑定</td>
+</tr>
+<tr class="even">
+<td><code>struct usb_host_interface</code></td>
+<td>某个 Alternate Setting 的描述符和端点集合</td>
+</tr>
+<tr class="odd">
+<td><code>struct usb_host_endpoint</code></td>
+<td>Host 侧端点描述、待处理 URB 及 HCD 私有状态</td>
+</tr>
+<tr class="even">
+<td><code>struct usb_driver</code></td>
+<td>USB 接口驱动，提供
+<code>id_table</code>、<code>probe()</code>、<code>disconnect()</code>
+和 PM 回调</td>
+</tr>
+<tr class="odd">
+<td><code>struct urb</code></td>
+<td>Host 异步传输请求，包含 Pipe、Buffer、长度、状态和完成回调</td>
+</tr>
+<tr class="even">
+<td><code>struct usb_anchor</code></td>
+<td>跟踪一组 URB，便于批量取消和断开清理</td>
+</tr>
+</tbody>
+</table>
+<p><code>usb_device</code> 表示整个设备，<code>usb_interface</code>
+表示功能接口，二者不可混用。<code>usb_device</code> 中的
+<code>rx_lanes</code>、<code>tx_lanes</code>
+表示接收和发送使用的通道数量，而不是 Type-C Lane 选择编号。</p>
+<h2 id="urb-生命周期">4.2 URB 生命周期</h2>
+<figure class="highlight text"><table><tr><td class="code"><pre><span class="line">usb_alloc_urb()</span><br><span class="line">  → 准备 Buffer / 填充请求 / usb_fill_*_urb()</span><br><span class="line">  → usb_anchor_urb()，需要批量管理时使用</span><br><span class="line">  → usb_submit_urb()</span><br><span class="line">  → HCD 执行 / DMA / 完成事件</span><br><span class="line">  → complete()：检查 status、actual_length</span><br><span class="line">  → 按业务重新提交，或释放请求与 Buffer</span><br></pre></td></tr></table></figure>
+<p>关键约束：</p>
+<ol type="1">
+<li>提交失败时不会产生该次请求的完成回调，应立即处理错误并撤销相应
+Anchor 关联。</li>
+<li>提交成功后，在完成回调或同步取消结束前，不得释放
+Buffer、私有上下文或修改在途请求。</li>
+<li><code>usb_unlink_urb()</code>
+发起异步取消；<code>usb_kill_urb()</code>
+等待请求及完成处理结束，不能在不可睡眠上下文调用。</li>
+<li>回调应按不可睡眠上下文设计，不使用阻塞 I/O、mutex 或
+<code>GFP_KERNEL</code> 分配；重任务转交工作队列。具体回调执行机制随 HCD
+和内核版本变化。</li>
+<li><code>disconnect()</code> 应先阻止新提交及回调重提，再取消
+URB、同步工作队列/定时器，最后释放引用和内存。Anchor
+不是完整的并发退出协议。</li>
+<li><code>transfer_buffer_length</code>
+是请求长度，<code>actual_length</code>
+是实际完成长度；成功的短传输不等于丢包。等时请求还需检查每个帧描述符的状态。</li>
+</ol>
+<p><code>usb_free_urb()</code> 释放 URB 引用，并不自动释放普通传输
+Buffer；引用计数、Buffer 所有权和 DMA 映射必须分别管理。</p>
+<h2 id="gadgetdwc3-与-xhci-对象">4.3 Gadget、DWC3 与 xHCI 对象</h2>
+<table>
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>层次</th>
+<th>结构</th>
+<th>作用</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Gadget</td>
+<td><code>struct usb_gadget</code></td>
+<td>UDC 对外呈现的设备侧能力和端点集合</td>
+</tr>
+<tr class="even">
+<td>Gadget</td>
+<td><code>struct usb_ep</code> / <code>struct usb_request</code></td>
+<td>端点和设备侧异步请求，通过 <code>usb_ep_queue()</code> 提交</td>
+</tr>
+<tr class="odd">
+<td>Composite</td>
+<td><code>struct usb_composite_dev</code> /
+<code>struct usb_configuration</code> /
+<code>struct usb_function</code></td>
+<td>复合设备、配置和功能对象</td>
+</tr>
+<tr class="even">
+<td>DWC3</td>
+<td><code>struct dwc3</code></td>
+<td>控制器私有对象，管理资源、角色、事件缓冲及 Gadget 状态</td>
+</tr>
+<tr class="odd">
+<td>DWC3</td>
+<td><code>struct dwc3_ep</code> / <code>struct dwc3_request</code></td>
+<td>DWC3 端点和请求封装，维护 TRB 与请求队列</td>
+</tr>
+<tr class="even">
+<td>DWC3</td>
+<td><code>struct dwc3_trb</code> /
+<code>struct dwc3_event_buffer</code></td>
+<td>Gadget DMA 描述符及控制器事件缓冲</td>
+</tr>
+<tr class="odd">
+<td>xHCI</td>
+<td><code>struct xhci_hcd</code></td>
+<td>xHCI 私有状态，关联主/共享 HCD 和寄存器区域</td>
+</tr>
+<tr class="even">
+<td>xHCI</td>
+<td><code>struct xhci_ring</code> /
+<code>struct xhci_segment</code></td>
+<td>Ring 及其分段，维护入队、出队和 Cycle 状态</td>
+</tr>
+<tr class="odd">
+<td>xHCI</td>
+<td><code>struct xhci_td</code> / <code>union xhci_trb</code></td>
+<td>软件 TD 管理对象及硬件 TRB 格式</td>
+</tr>
+<tr class="even">
+<td>xHCI</td>
+<td><code>struct xhci_virt_device</code> /
+<code>struct xhci_virt_ep</code></td>
+<td>控制器设备槽位及端点的软件状态</td>
+</tr>
+</tbody>
+</table>
+<p>Gadget 侧使用 <code>usb_request</code>，Host 侧使用
+URB，不能相互替代。驱动私有结构不是稳定
+ABI，外部调试模块不应重新声明“同名简化结构”并强制转换访问。</p>
+<h2 id="dma-与并发">4.4 DMA 与并发</h2>
+<ul>
+<li>DMA 地址、CPU 虚拟地址和物理地址是不同概念；启用 IOMMU
+后尤其不能相互直接强转。</li>
+<li>使用 DMA API 分配或映射内存，正确设置 DMA
+Mask、方向和缓存同步；普通内核栈内存不能直接作为异步 DMA Buffer。</li>
+<li>更新描述符时，须遵循硬件规定的字段写入、内存屏障及所有权交接顺序，最后再触发
+Doorbell 或传输命令。</li>
+<li>IRQ、自旋锁保护区、工作队列、用户态接口和角色切换可能并发，应明确锁顺序和对象寿命。</li>
+<li>资源释放前必须停止硬件访问并同步 IRQ、异步请求及工作项；仅使用
+<code>devm_*()</code> 不能消除在途 DMA 和回调竞态。</li>
+</ul>
+<h1 id="dwc3-驱动结构与关键流程">5 DWC3 驱动结构与关键流程</h1>
+<h2 id="模块职责">5.1 模块职责</h2>
+<table>
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>模块</th>
+<th>典型文件</th>
+<th>职责</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>SoC Glue</td>
+<td><code>dwc3-*.c</code></td>
+<td>平台资源、时钟、复位、电源域、互连及平台特性</td>
+</tr>
+<tr class="even">
+<td>Core</td>
+<td><code>core.c</code>、<code>core.h</code></td>
+<td>IP 识别、能力检测、核心初始化、PHY 协作、模式和 PM 管理</td>
+</tr>
+<tr class="odd">
+<td>Host</td>
+<td><code>host.c</code></td>
+<td>创建并配置 xHCI 平台子设备，将主机传输交给 xHCI</td>
+</tr>
+<tr class="even">
+<td>Gadget</td>
+<td><code>gadget.c</code>、<code>ep0.c</code></td>
+<td>UDC 注册、EP0 状态机、端点命令、请求及设备事件</td>
+</tr>
+<tr class="odd">
+<td>DRD</td>
+<td><code>drd.c</code></td>
+<td>角色框架接入及角色切换状态管理</td>
+</tr>
+<tr class="even">
+<td>调试</td>
+<td><code>debugfs.c</code>、<code>trace.c</code>、<code>trace.h</code></td>
+<td>寄存器、端点、TRB 状态和跟踪事件</td>
+</tr>
+</tbody>
+</table>
+<p>不同 DWC3/DWC_usb31 等 IP 修订的能力和寄存器细节存在差异。Quirk
+必须有对应的硬件限制、勘误或验证依据，不应作为通用“提速开关”。</p>
+<h2 id="探测与初始化">5.2 探测与初始化</h2>
+<p>典型流程如下，具体调用顺序受平台和内核版本影响：</p>
+<figure class="highlight text"><table><tr><td class="code"><pre><span class="line">SoC Glue probe / DWC3 platform probe</span><br><span class="line">  → 获取寄存器、IRQ、时钟、复位、电源域、PHY 等资源</span><br><span class="line">  → 建立 DMA 能力及运行时 PM 条件</span><br><span class="line">  → 识别 IP / 读取硬件能力 / 解析固件属性</span><br><span class="line">  → 核心复位、PHY 初始化及相关参数配置</span><br><span class="line">  → 按角色初始化</span><br><span class="line">      Host：dwc3_host_init() → xHCI 子设备 → HCD / Root Hub</span><br><span class="line">      Device：dwc3_gadget_init() → 注册 UDC</span><br><span class="line">      DRD：接入角色事件，激活相应角色</span><br></pre></td></tr></table></figure>
+<p>DWC3 Host 模式下通常由 xHCI 管理中断和传输 Ring；DWC3 Gadget
+模式下由设备侧中断和事件缓冲驱动请求完成。两条路径不能套用同一份
+TRB/事件解释。</p>
+<p>初始化失败必须逆序回滚已启用资源。<code>-EPROBE_DEFER</code> 通常表示
+PHY、时钟或其他依赖尚未就绪，不宜直接当作硬件故障。</p>
+<h2 id="host-枚举与驱动绑定">5.3 Host 枚举与驱动绑定</h2>
+<figure class="highlight text"><table><tr><td class="code"><pre><span class="line">端口连接变化</span><br><span class="line">  → xHCI Port Status Change Event</span><br><span class="line">  → Root Hub 状态通知；必要时先恢复挂起的 Root Hub</span><br><span class="line">  → hub_event() / port_event()</span><br><span class="line">  → 去抖、端口初始化、复位和地址建立</span><br><span class="line">  → 读取设备、配置及能力描述符</span><br><span class="line">  → usb_new_device() / 设备模型注册</span><br><span class="line">  → 选择配置，usb_set_configuration()</span><br><span class="line">  → 接口注册及匹配，usb_probe_interface()</span><br><span class="line">  → 功能驱动 probe()</span><br></pre></td></tr></table></figure>
+<p>该流程是逻辑路径，不是固定不变的同步调用栈。Root Hub 事件与外置 Hub
+的状态通知机制不同；挂起恢复也不是每次枚举的必经步骤。</p>
+<p>USB 设备地址的设置由 usbcore 与 HCD 协作完成；xHCI 使用 Address
+Device 等控制器命令，抓包中不一定能看到软件直接提交的
+<code>SET_ADDRESS</code> 请求。</p>
+<p>存储设备继续执行 <code>uas_probe()</code> 或 BOT 驱动探测、SCSI Host
+注册、LUN 扫描、<code>sd_probe()</code>
+和磁盘注册，最终生成块设备节点。只有 Root Hub
+日志不代表外设已枚举成功。</p>
+<h2 id="数据传输与完成">5.4 数据传输与完成</h2>
+<p><strong>Host 路径：</strong></p>
+<figure class="highlight text"><table><tr><td class="code"><pre><span class="line">功能驱动 → usb_submit_urb() → HCD urb_enqueue</span><br><span class="line">  → 构建 xHCI TD/TRB → Transfer Ring → Doorbell</span><br><span class="line">  → 控制器执行 → Transfer Event → HCD 回收</span><br><span class="line">  → usb_hcd_giveback_urb() → 功能驱动 complete()</span><br></pre></td></tr></table></figure>
+<p><strong>Gadget 路径：</strong></p>
+<figure class="highlight text"><table><tr><td class="code"><pre><span class="line">Function → usb_ep_queue() → DWC3 请求队列</span><br><span class="line">  → DMA 映射 / 构建 DWC3 TRB</span><br><span class="line">  → 启动或更新端点传输</span><br><span class="line">  → DWC3 Endpoint Event → 请求完成 → Function complete()</span><br></pre></td></tr></table></figure>
+<p>一个 URB/Request 可涉及多个
+TRB；拆分受传输类型、长度、分散-聚集列表（scatterlist）、地址边界和硬件限制影响。不能用
+URB 数量直接推算 TRB 占用。</p>
+<h2 id="设备树与移植检查">5.5 设备树与移植检查</h2>
+<p>应同时检查 DWC3、SoC Glue、PHY、连接器和电源相关
+Binding。基于已有板级节点的属性片段示例：</p>
+<figure class="highlight dts"><table><tr><td class="code"><pre><span class="line"><span class="comment">/* 仅演示属性；资源和连接关系由板级完整节点提供。 */</span></span><br><span class="line"><span class="variable">&amp;usb_dwc3</span> <span class="punctuation">&#123;</span></span><br><span class="line">    dr_<span class="attr">mode</span> <span class="operator">=</span> <span class="string">&quot;otg&quot;</span><span class="punctuation">;</span></span><br><span class="line">    <span class="attr">maximum-speed</span> <span class="operator">=</span> <span class="string">&quot;super-speed-plus&quot;</span><span class="punctuation">;</span></span><br><span class="line">    <span class="attr">usb-role-switch</span><span class="punctuation">;</span></span><br><span class="line">    <span class="attr">status</span> <span class="operator">=</span> <span class="string">&quot;okay&quot;</span><span class="punctuation">;</span></span><br><span class="line"><span class="punctuation">&#125;;</span></span><br></pre></td></tr></table></figure>
+<ul>
+<li><code>dr_mode</code> 可为 <code>host</code>、<code>peripheral</code>
+或 <code>otg</code>，但实际角色能力还取决于内核配置、硬件及事件源。</li>
+<li><code>maximum-speed</code> 是能力上限，不会将不支持的
+PHY、线缆或外设强制提升到更高速率。</li>
+<li><code>usb-role-switch</code> 声明角色切换接入；Type-C
+控制器、连接器图及 PHY/mux 关系仍需按平台 Binding 描述。</li>
+<li><code>role-switch-default-mode</code> 等属性应核对目标版本
+Binding；设备树中的 <code>peripheral</code> 与 Role Switch sysfs 中的
+<code>device</code> 不是同一取值体系。</li>
+<li>检查 <code>reg</code>、中断、时钟、复位、PHY 及
+<code>phy-names</code>、电源域、IOMMU
+等资源，不能复制其他平台的地址、IRQ 或 Stream ID。</li>
+<li>使用 <code>make dtbs_check</code> 校验；确认 Bootloader 实际加载的
+DTB 与构建产物一致，避免只修改未被使用的文件。</li>
+</ul>
+<p>建议配置包括
+<code>CONFIG_USB</code>、<code>CONFIG_USB_XHCI_HCD</code>、<code>CONFIG_USB_XHCI_PLATFORM</code>、<code>CONFIG_USB_DWC3</code>；Gadget/DRD
+场景按需选择
+<code>CONFIG_USB_GADGET</code>、<code>CONFIG_USB_CONFIGFS</code>、DWC3
+模式及 Role/Type-C 支持。配置依赖以目标 Kconfig 为准。</p>
+<h1 id="xhci-ring-与寄存器机制">6 xHCI Ring 与寄存器机制</h1>
+<h2 id="ring-与上下文">6.1 Ring 与上下文</h2>
 <table>
 <colgroup>
 <col style="width: 33%">
@@ -673,365 +1153,223 @@ UAS/BOT、SCSI 扫描和 <code>sd_probe</code> 共同完成的结果。</p>
 <thead>
 <tr class="header">
 <th>对象</th>
-<th>作用</th>
-<th>面试中应强调的关系</th>
+<th>生产者 → 消费者</th>
+<th>用途</th>
 </tr>
 </thead>
 <tbody>
 <tr class="odd">
-<td><code>usb_hcd</code></td>
-<td>一个 Host Controller Driver 实例</td>
-<td>内嵌 <code>usb_bus</code>，关联 <code>hc_driver</code>、root
-hub、PHY 和唤醒工作项</td>
+<td>Command Ring</td>
+<td>软件 → 控制器</td>
+<td>Enable Slot、Address Device、Configure Endpoint 等命令</td>
 </tr>
 <tr class="even">
-<td><code>usb_bus</code></td>
-<td>USB 总线对象</td>
-<td><code>root_hub</code> 指向根 Hub；xHCI 通常分别呈现 USB 2 与 USB 3
-根总线</td>
+<td>Transfer Ring</td>
+<td>软件 → 控制器</td>
+<td>端点数据传输；启用 Streams 时可能存在多个流关联 Ring</td>
 </tr>
 <tr class="odd">
-<td><code>usb_device</code></td>
-<td>一个物理 USB 设备</td>
-<td>保存地址、速率、状态、描述符、配置、父 Hub、端点和
-<code>ep0</code></td>
+<td>Event Ring</td>
+<td>控制器 → 软件</td>
+<td>命令完成、传输完成、端口变化等事件</td>
 </tr>
 <tr class="even">
-<td><code>usb_interface</code></td>
-<td>设备某个配置中的一个接口</td>
-<td>大多数 USB 类驱动绑定的是 Interface，而不是整个
-<code>usb_device</code></td>
-</tr>
-<tr class="odd">
-<td><code>usb_host_config</code> / <code>actconfig</code></td>
-<td>所有配置与当前激活配置</td>
-<td><code>usb_set_configuration()</code> 后才创建并注册相应
-Interface</td>
-</tr>
-<tr class="even">
-<td><code>urb</code></td>
-<td>一次 USB 传输请求</td>
-<td>描述 pipe、缓冲区、长度、完成回调和状态，是 Host 侧 I/O 核心</td>
-</tr>
-<tr class="odd">
-<td><code>usb_anchor</code></td>
-<td>一组 URB 的生命周期管理容器</td>
-<td>在 disconnect、suspend、reset 时统一取消或等待 URB</td>
-</tr>
-<tr class="even">
-<td><code>xhci_op_regs</code></td>
-<td>xHCI Operational Registers 的软件映射</td>
-<td>包含命令、状态、Command Ring、DCBAA、端口寄存器等</td>
+<td>Device / Endpoint Context</td>
+<td>软件配置，硬件按规范读取或更新</td>
+<td>描述 Slot、端点参数和运行状态</td>
 </tr>
 </tbody>
 </table>
-<p><code>usb_device.devnum</code> 是 usbcore 分配的设备地址，也用于
-<code>/dev/bus/usb/BBB/DDD</code> 的编号。若特定内核树还包含
-<code>devaddr</code>
-等平台扩展字段，应结合其赋值和读取位置确认语义，不要仅凭字段名推断存在另一套地址体系。</p>
-<h2 id="urb-生命周期与所有权">3.2 URB 生命周期与所有权</h2>
-<p>典型流程：</p>
-<figure class="highlight text"><table><tr><td class="code"><pre><span class="line">usb_alloc_urb()</span><br><span class="line">    |</span><br><span class="line">usb_fill_bulk/control/int_urb()</span><br><span class="line">    |</span><br><span class="line">usb_anchor_urb()                 // 可选，但复杂驱动强烈建议</span><br><span class="line">    |</span><br><span class="line">usb_submit_urb(..., gfp_flags)</span><br><span class="line">    |</span><br><span class="line">HCD 接管并排入控制器队列</span><br><span class="line">    |</span><br><span class="line">complete(urb)</span><br><span class="line">    |-- 检查 urb-&gt;status</span><br><span class="line">    |-- 检查 urb-&gt;actual_length</span><br><span class="line">    |-- 消费数据或处理错误</span><br><span class="line">    |-- 重新提交，或释放资源</span><br><span class="line">    |</span><br><span class="line">usb_unanchor_urb() / usb_free_urb()</span><br></pre></td></tr></table></figure>
-<p>必须掌握的细节：</p>
+<p>xHCI TRB 为 16 字节。Command/Transfer Ring 通常通过 Link TRB
+连接分段；Event Ring 使用 Event Ring Segment
+Table，不能按相同方式遍历。Cycle Bit 表示生产者/消费者有效性，必须结合
+Ring 状态解释，不能仅凭某个槽位非零判断“正在使用”。</p>
+<p>DWC3 Gadget TRB 虽也常为 16 字节，但字段、类型、所有权位和完成机制与
+xHCI 不同。</p>
+<h2 id="寄存器定位与访问">6.2 寄存器定位与访问</h2>
+<p>设 <code>XHCI_CAP_BASE</code> 为 <strong>xHCI Capability
+寄存器基址</strong>：</p>
+<figure class="highlight text"><table><tr><td class="code"><pre><span class="line">Operational Base = XHCI_CAP_BASE + CAPLENGTH</span><br><span class="line">PORTSC(n) = Operational Base + 0x400 + 0x10 × (n - 1)</span><br></pre></td></tr></table></figure>
+<p><code>n</code> 为从 1 开始的 xHCI 硬件端口号。Runtime 和 Doorbell
+区域通过相应偏移寄存器定位。DWC3 全局寄存器映射与 xHCI Capability
+区域不是可随意替换的同一基址。</p>
+<p>访问原则：</p>
 <ul>
-<li><code>transfer_buffer_length</code>
-是请求长度，<code>actual_length</code> 是实际完成长度；IN
-传输短包并不天然等于错误。</li>
-<li><code>status == 0</code> 只说明传输在 USB/HCD 层面完成，不代表
-SCSI、ADB 等上层协议一定成功。</li>
-<li>提交成功后，在回调或取消完成前，驱动不能随意释放 URB、传输 buffer
-或上下文对象。</li>
-<li>完成回调应按<strong>原子上下文</strong>设计，除非当前 HCD
-和内核版本明确给出其他保证。不要睡眠、不要持锁等待耗时操作，大块工作应转交
-workqueue 或内核线程。</li>
-<li><code>usb_unlink_urb()</code>
-偏向异步取消；<code>usb_kill_urb()</code>
-会等待取消结束，可能睡眠；断开后还要防止回调再次提交 URB，可结合 anchor
-的 poison 机制。</li>
-<li><code>GFP_KERNEL</code>、<code>GFP_ATOMIC</code>、<code>GFP_NOIO</code>
-的选择取决于调用上下文和回收路径。尤其在存储错误处理或内存压力路径中，不能机械地使用
-<code>GFP_KERNEL</code>。</li>
+<li>优先通过驱动已有的寄存器访问函数和 debugfs
+读取，确保控制器已上电且时钟有效。</li>
+<li>识别只读、保留位、W1C 和具有副作用的字段。<code>PORTSC</code>
+不适合无条件读改写，错误回写可能清除变化位或改变端口状态。</li>
+<li>不在控制器仍进行 DMA 时直接重置硬件、修改 Ring 指针或电源状态。</li>
+<li>IP 标识寄存器读取正常，只能证明部分 MMIO 路径可达，不能证明
+PHY、IRQ、DMA 或数据链路正常。</li>
 </ul>
-<p>工作记录中 xHCI 使用带 <code>HCD_BH</code> 的 HCD，URB giveback 可经
-bottom half/tasklet 路径调用
-<code>urb-&gt;complete()</code>。这解释了为什么数据完成栈中会出现：</p>
-<figure class="highlight text"><table><tr><td class="code"><pre><span class="line">usb_giveback_urb_bh</span><br><span class="line">  -&gt; __usb_hcd_giveback_urb</span><br><span class="line">     -&gt; uas_data_cmplt</span><br></pre></td></tr></table></figure>
-<h2 id="xhci-ringtrb-与中断">3.3 xHCI Ring、TRB 与中断</h2>
-<p>xHCI
-的关键不是“读写几个寄存器”，而是基于内存环队列的生产者—消费者模型：</p>
+<h1 id="角色电源管理与代理传输">7 角色、电源管理与代理传输</h1>
+<h2 id="角色与连接方向">7.1 角色与连接方向</h2>
+<p>角色来源通常是固定设备树配置、Type-C 端口管理、Role Switch 或旧式
+extcon/OTG 机制。应明确唯一的策略控制者，避免用户态脚本与内核 Type-C
+状态机相互覆盖。</p>
+<p>手工切换仅适用于允许用户态控制角色的系统，切换前应停止业务、卸载存储并解绑
+Gadget。先枚举实际节点：</p>
+<figure class="highlight sh"><table><tr><td class="code"><pre><span class="line"><span class="built_in">ls</span> /sys/class/usb_role/</span><br><span class="line"><span class="built_in">cat</span> /sys/class/usb_role/&lt;role-switch&gt;/role</span><br><span class="line"><span class="comment"># 确认资源已释放，且平台支持手工控制后执行其中一种：</span></span><br><span class="line"><span class="built_in">echo</span> host &gt; /sys/class/usb_role/&lt;role-switch&gt;/role</span><br><span class="line"><span class="comment"># echo device &gt; /sys/class/usb_role/&lt;role-switch&gt;/role</span></span><br></pre></td></tr></table></figure>
+<p>切换可能异步完成，应结合 UDC、Root Hub 和日志验证最终状态。正反插由
+Type-C switch/mux/PHY 路径处理；平台私有 <code>orientation</code>
+节点的数值和 Lane 映射不是通用 Linux ABI。</p>
+<h2 id="runtime-pm-与系统休眠">7.2 Runtime PM 与系统休眠</h2>
 <ul>
-<li><strong>Command Ring</strong>：软件提交 Enable Slot、Address
-Device、Configure Endpoint 等命令。</li>
-<li><strong>Transfer
-Ring</strong>：每个活动端点对应传输环，承载控制、Bulk、Interrupt、Isochronous
-数据。</li>
-<li><strong>Event
-Ring</strong>：控制器写入命令完成、端口状态变化和传输完成事件。</li>
-<li><strong>TRB</strong>：16 字节描述符，包含数据 buffer 的 DMA
-地址、长度、类型、Cycle、IOC 等控制信息。</li>
-<li><strong>DCBAA</strong>：Device Context Base Address
-Array，用于定位各 Slot 的 Device Context。</li>
+<li><strong>Runtime PM</strong>：设备空闲时自动挂起，发生 I/O
+或唤醒事件时恢复。</li>
+<li><strong>System Suspend/Resume</strong>：系统级休眠恢复，需协调
+Function、控制器、PHY、电源域及唤醒源。</li>
+<li><strong>USB 2.0 LPM、USB 3.x
+U1/U2/U3</strong>：总线或链路低功耗机制，不等同于控制器 Runtime
+PM，也不等同于 STR。</li>
 </ul>
-<p>一次 Bulk OUT 可简化为：</p>
-<figure class="highlight text"><table><tr><td class="code"><pre><span class="line">类驱动提交 URB</span><br><span class="line">  -&gt; usbcore 调用 HCD urb_enqueue</span><br><span class="line">  -&gt; xHCI 将 URB 转成 TD 和一个或多个 TRB</span><br><span class="line">  -&gt; queue_trb() 写 Transfer Ring</span><br><span class="line">  -&gt; 按规则更新 Cycle bit 并敲 Doorbell</span><br><span class="line">  -&gt; 控制器通过 DMA 取 TRB 和数据</span><br><span class="line">  -&gt; 产生 Transfer Event</span><br><span class="line">  -&gt; HCD 计算实际长度/错误并 giveback URB</span><br></pre></td></tr></table></figure>
-<p>一次热插拔事件则通常经过：</p>
-<figure class="highlight text"><table><tr><td class="code"><pre><span class="line">PORTSC 变化</span><br><span class="line">  -&gt; Port Status Change Event TRB</span><br><span class="line">  -&gt; xHCI IRQ</span><br><span class="line">  -&gt; xhci_handle_event()</span><br><span class="line">  -&gt; handle_port_status()</span><br><span class="line">  -&gt; root hub resume / hub 工作队列</span><br></pre></td></tr></table></figure>
-<p><strong>易错点</strong>：TRB 中的 buffer pointer 是 DMA 地址，不是
-CPU 可直接解引用的虚拟地址。原文实验代码中将其强转后
-<code>readl()</code>，只能作为反例；正确做法是结合原 URB 的 CPU
-buffer、scatterlist 和 DMA mapping
-状态读取，不能在任意上下文中直接访问该数值。</p>
-<hr>
-<h1 id="从插入存储设备到生成块设备">4. 从插入存储设备到生成块设备</h1>
-<h2 id="主控制器初始化">4.1 主控制器初始化</h2>
-<p><code>usb_init()</code> 注册 usbfs、初始化 Hub 驱动；xHCI HCD probe
-后创建 HCD、注册 USB 总线和 root hub。工作日志中可见：</p>
-<ul>
-<li>一个 xHCI 控制器注册两条总线，分别承载 USB 2 与 USB 3
-速率体系。</li>
-<li>root hub 完成端口检测、电源信息上报。</li>
-<li>日志出现禁用 LPM 时，表示该 Host
-的链路电源管理能力未启用，不应直接理解为设备异常。</li>
-<li>root hub 可 runtime suspend；端口事件到来后，需要先恢复 root
-hub，再处理端口变化。</li>
-</ul>
-<p>DWC3
-的平台适配通常还依赖设备树中的时钟、复位、PHY、IOMMU、中断、角色和最大速率属性。若连
-<code>xHCI Host Controller</code> 日志都没有，应优先检查 platform probe
-及其依赖，而不是先分析枚举协议。</p>
-<h2 id="端口事件与-hub-枚举">4.2 端口事件与 Hub 枚举</h2>
-<p>基于工作记录，可整理出以下主调用链：</p>
-<figure class="highlight text"><table><tr><td class="code"><pre><span class="line">xhci_irq()</span><br><span class="line">  -&gt; xhci_handle_event()</span><br><span class="line">     -&gt; handle_port_status()</span><br><span class="line">        -&gt; usb_hcd_resume_root_hub()</span><br><span class="line">           -&gt; hcd_resume_work()</span><br><span class="line">              -&gt; usb_remote_wakeup(root_hub)</span><br><span class="line">                 -&gt; usb_autoresume_device()</span><br><span class="line">                    -&gt; usb_runtime_resume()</span><br><span class="line">                       -&gt; hub_resume()</span><br><span class="line">                          -&gt; hub_activate()</span><br><span class="line">                             -&gt; kick_hub_wq()</span><br><span class="line"></span><br><span class="line">hub_event()</span><br><span class="line">  -&gt; port_event()</span><br><span class="line">     -&gt; hub_port_connect_change()</span><br><span class="line">        -&gt; hub_port_connect()</span><br><span class="line">           -&gt; usb_alloc_dev()</span><br><span class="line">           -&gt; hub_port_init()</span><br><span class="line">           -&gt; usb_new_device()</span><br></pre></td></tr></table></figure>
-<p>这里有两个不同层面的延迟处理：</p>
+<p>排查休眠相关故障时，记录父子设备的 PM
+状态、引用计数行为、挂起期间的角色事件及恢复后重新枚举情况。驱动中使用可检查返回值的
+PM 获取接口，并严格配对释放；不能在恢复失败时继续访问寄存器。</p>
+<p>可在实验中临时将对应 USB 设备的 <code>power/control</code> 从
+<code>auto</code> 改为 <code>on</code>
+做对照，结束后恢复原值。禁用自动挂起只能帮助定位，不应直接当作量产修复。</p>
+<h2 id="多系统-usb-代理与虚拟控制器">7.3 多系统 USB
+代理与虚拟控制器</h2>
+<p>多处理系统可能采用“Linux 虚拟 HCD/UDC → IPC 代理 → 另一处理系统的物理
+UDC”的结构。<code>dummy_hcd</code> 适合验证 Gadget/Host
+软件交互，不等价于真实 PHY、DMA、总线时序和性能。</p>
+<p>代理设计必须满足：</p>
 <ol type="1">
-<li><code>hcd_resume_work</code> 处理 root hub 的恢复与 wakeup。</li>
-<li><code>hub_event</code> 处理端口扫描、去抖、连接、断开和枚举。</li>
+<li>保留方向、端点、实际长度、短包、ZLP、状态和取消语义。</li>
+<li>不因聚合 Buffer 较大而无限等待；不能把 ADB 消息边界、URB
+边界和最大包长边界混为一谈。</li>
+<li>使用有界队列、背压和明确的消息定界/刷新规则；计数或超时刷新可作补充，不能取代正确的协议语义。</li>
+<li>处理断连、角色切换、处理系统重启后的在途请求清理，防止旧响应完成新请求。</li>
+<li>共享控制器应明确唯一硬件所有者，并协调中断、DMA、复位、PHY 和
+IOMMU；仅屏蔽某个系统的中断不足以完成安全移交。</li>
 </ol>
-<p>不能在 hard IRQ
-中直接完成整个枚举，因为端口去抖、控制传输、内存分配和驱动 probe
-都可能耗时或睡眠。</p>
-<p><code>hub_port_init()</code>
-阶段涉及端口复位、地址分配和初始描述符读取；<code>usb_new_device()</code>
-继续读取设备/配置/BOS/字符串描述符并注册设备。失败点越靠前，越应该结合
-PORTSC、EP0 控制传输和 PHY 状态分析。</p>
-<h2 id="portsc-的实际判读">4.3 PORTSC 的实际判读</h2>
-<p>工作记录使用了如下状态：</p>
-<ul>
-<li><code>0x0100</code>：Port Power 置位，但没有 Current Connect
-Status，表示端口已供电、未连接。</li>
-<li><code>0x0203</code>：Port Power、Port Enabled、Current Connect
-Status 置位，PLS 为 U0，表示高速链路已进入正常工作状态。</li>
-<li><code>0x02a0</code>：链路处于
-RxDetect，未形成已启用的设备连接。</li>
-<li><code>0x0263</code>：设备仍处于逻辑连接/使能状态，但 PLS 为
-U3，常见于逻辑断开前的低功耗状态。</li>
-</ul>
-<p>寄存器位含义要结合 xHCI
-版本和完整值判断，不能只看日志中的单个十六进制数，更不能把
-<code>status</code> 与 <code>change</code> 位图混为一谈。</p>
-<p>xHCI 地址计算也应理解而非背具体数值：</p>
-<figure class="highlight text"><table><tr><td class="code"><pre><span class="line">Operational Base = Controller Base + CAPLENGTH</span><br><span class="line">PORTSC(n) = Operational Base + 0x400 + 0x10 * (n - 1)</span><br></pre></td></tr></table></figure>
-<h2 id="device-probe-与-interface-probe">4.4 Device probe 与 Interface
-probe</h2>
-<figure class="highlight text"><table><tr><td class="code"><pre><span class="line">usb_new_device()</span><br><span class="line">  -&gt; usb_enumerate_device()</span><br><span class="line">  -&gt; device_add(&amp;udev-&gt;dev)</span><br><span class="line">     -&gt; usb_probe_device()</span><br><span class="line">        -&gt; usb_generic_driver_probe()</span><br><span class="line">           -&gt; usb_choose_configuration()</span><br><span class="line">           -&gt; usb_set_configuration()</span><br><span class="line">              -&gt; 发送 SET_CONFIGURATION</span><br><span class="line">              -&gt; 状态切换为 USB_STATE_CONFIGURED</span><br><span class="line">              -&gt; device_add(&amp;intf-&gt;dev)</span><br><span class="line">                 -&gt; usb_probe_interface()</span><br><span class="line">                    -&gt; 匹配 dynamic id / id_table</span><br><span class="line">                    -&gt; driver-&gt;probe(intf, id)</span><br></pre></td></tr></table></figure>
-<p>面试高频点是：<strong>为什么设备已经枚举成功，自己的驱动 probe
-仍不执行？</strong></p>
-<p>排查顺序应是：</p>
-<ol type="1">
-<li>配置是否已激活，目标 Interface 是否被创建。</li>
-<li>VID/PID、bDeviceClass 与 bInterfaceClass/SubClass/Protocol
-是否匹配。</li>
-<li>Interface 是否已被其他驱动占用，或是否处于未授权状态。</li>
-<li>是否使用正确 alternate setting，UAS 驱动是否需要切换接口。</li>
-<li>驱动是否注册成功，模块依赖和 probe 是否提前失败。</li>
-</ol>
-<h2 id="uas-到-scsi-disk">4.5 UAS 到 SCSI Disk</h2>
-<p>UAS probe 的核心工作包括：</p>
-<ul>
-<li>检查兼容性并选择 UAS Interface。</li>
-<li>分配 <code>Scsi_Host</code> 和 <code>uas_dev_info</code>。</li>
-<li>初始化 command、sense、data 三类 URB anchor。</li>
-<li>配置 Command OUT、Status IN、Data IN、Data OUT 四类 Bulk pipe。</li>
-<li>初始化工作任务与扫描任务。</li>
-<li><code>scsi_add_host()</code> 注册 SCSI
-Host，<code>uas_scan_work()</code> 触发 SCSI 扫描。</li>
-</ul>
-<p>后续链路为：</p>
-<figure class="highlight text"><table><tr><td class="code"><pre><span class="line">scsi_scan_host()</span><br><span class="line">  -&gt; 扫描 channel / target / LUN</span><br><span class="line">  -&gt; scsi_probe_lun()          // INQUIRY</span><br><span class="line">  -&gt; scsi_add_lun()</span><br><span class="line">  -&gt; scsi_sysfs_add_sdev()</span><br><span class="line">     -&gt; device_add()</span><br><span class="line">        -&gt; sd_probe()</span><br><span class="line">           -&gt; 分配 scsi_disk / gendisk / 盘符</span><br><span class="line">           -&gt; sd_revalidate_disk()</span><br><span class="line">              -&gt; 启动介质、READ CAPACITY</span><br><span class="line">              -&gt; 读写保护、缓存、I/O 尺寸等参数</span><br><span class="line">           -&gt; device_add_disk()</span><br><span class="line">              -&gt; 形成块设备及分区节点</span><br></pre></td></tr></table></figure>
-<p>因此，没有 <code>/dev/sdX</code> 时不能把问题笼统归为“USB 没通”：</p>
-<ul>
-<li>没有 <code>scsi hostX</code>：重点看 UAS/BOT probe。</li>
-<li>有 SCSI Host 但没有 LUN：看 INQUIRY 和 SCSI 扫描。</li>
-<li>有 LUN 但没有容量：看 READ CAPACITY、Sense 和错误恢复。</li>
-<li>有容量但没有分区：看分区表、块层和用户空间分区服务。</li>
-</ul>
-<h2 id="安全弹出与物理拔出不是同一事件">4.6
-安全弹出与物理拔出不是同一事件</h2>
-<p>工作记录中的安全弹出先出现
-<code>Synchronizing SCSI cache</code>，随后发生 logical disconnect
-和设备注销；物理拔出则主要表现为端口连接状态消失。</p>
-<p>安全弹出通常包括：</p>
-<ol type="1">
-<li>文件系统同步并停止新 I/O。</li>
-<li>块层/SCSI 刷新缓存，必要时停止单元。</li>
-<li>USB 逻辑断开，执行 Interface disconnect，取消 URB 并释放资源。</li>
-<li>端口仍可能保持供电，不能仅以 VBUS 存在判断设备仍可用。</li>
-</ol>
-<p><code>Synchronize Cache(10) failed</code> 需要结合
-<code>hostbyte</code>、<code>driverbyte</code>、Sense 和 URB
-完成状态分析。<code>hostbyte=0x07</code> 属于 Host
-侧错误类别，不能简单解释为“磁盘介质损坏”。</p>
-<hr>
-<h1 id="gadget角色切换与-type-c-方向">5. Gadget、角色切换与 Type-C
-方向</h1>
-<h2 id="gadget-功能链路">5.1 Gadget 功能链路</h2>
-<p>Linux Device 模式可概括为：</p>
-<figure class="highlight text"><table><tr><td class="code"><pre><span class="line">用户空间 configfs / 配置脚本</span><br><span class="line">  -&gt; Composite Gadget</span><br><span class="line">  -&gt; ADB、Mass Storage 等 Function</span><br><span class="line">  -&gt; UDC 驱动</span><br><span class="line">  -&gt; DWC3 Device 模式</span><br></pre></td></tr></table></figure>
-<p>配置脚本负责组合 Function、描述符、字符串和 UDC
-绑定。切换角色或重新配置前，应停止依赖旧 Gadget
-配置的后台服务，否则可能出现：</p>
-<ul>
-<li>旧 Function 仍持有 UDC/request；</li>
-<li>新配置重复创建 Function；</li>
-<li>角色切换与 uevent/configfs 操作竞争；</li>
-<li>UDC 已消失，上层仍继续提交 request。</li>
-</ul>
-<h2 id="role-switch-调用链">5.2 Role Switch 调用链</h2>
-<p>工作记录中的角色写入路径为：</p>
-<figure class="highlight text"><table><tr><td class="code"><pre><span class="line">/sys/class/usb_role/&lt;role-switch&gt;/role</span><br><span class="line">  -&gt; role_store()</span><br><span class="line">  -&gt; usb_role_switch_set_role()</span><br><span class="line">  -&gt; 控制器 role switch set 回调</span><br><span class="line">  -&gt; dwc3_set_mode()</span><br><span class="line">  -&gt; drd_work</span><br><span class="line">  -&gt; __dwc3_set_mode()</span><br></pre></td></tr></table></figure>
-<p>示意操作：</p>
-<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line"><span class="built_in">echo</span> host   &gt; /sys/class/usb_role/&lt;role-switch&gt;/role</span><br><span class="line"><span class="built_in">echo</span> device &gt; /sys/class/usb_role/&lt;role-switch&gt;/role</span><br></pre></td></tr></table></figure>
-<p>需要强调：<code>drd_work</code> 将切换放到可睡眠上下文执行，适合处理
-PHY、控制器和驱动重建等复杂动作。角色切换必须有明确的状态机和互斥，防止
-Type-C 通知、用户写 sysfs 和系统电源操作同时修改模式。</p>
-<h2 id="orientation-与速率问题">5.3 Orientation 与速率问题</h2>
-<p>工作记录中的 lane 实验呈现：</p>
+<h1 id="常见调试手段">8 常见调试手段</h1>
+<h2 id="分层建立证据">8.1 分层建立证据</h2>
+<p>推荐顺序：<strong>供电/线缆与连接 → PHY/速率 → 控制器 → usbcore 枚举
+→ 接口绑定 → 上层协议 → 应用</strong>。</p>
+<figure class="highlight sh"><table><tr><td class="code"><pre><span class="line"><span class="built_in">uname</span> -a</span><br><span class="line"><span class="built_in">cat</span> /proc/cmdline</span><br><span class="line">dmesg -w</span><br><span class="line">lsusb -t</span><br><span class="line">lsusb -v -s &lt;bus&gt;:&lt;device&gt;</span><br><span class="line">lsblk -o NAME,TRAN,SIZE,FSTYPE,MOUNTPOINTS</span><br><span class="line"><span class="built_in">ls</span> /sys/class/udc/</span><br><span class="line"><span class="built_in">ls</span> /sys/class/usb_role/</span><br><span class="line"><span class="built_in">readlink</span> -f /sys/bus/usb/devices/&lt;device-path&gt;/driver</span><br><span class="line"><span class="built_in">readlink</span> -f /sys/bus/usb/devices/&lt;interface-path&gt;/driver</span><br><span class="line"><span class="built_in">cat</span> /sys/bus/usb/devices/&lt;device-path&gt;/speed</span><br></pre></td></tr></table></figure>
+<p><code>&lt;device-path&gt;</code> 如
+<code>2-1</code>，<code>&lt;interface-path&gt;</code> 如
+<code>2-1:1.0</code>，均以实际枚举结果为准。总线号和
+<code>/dev/sdX</code>
+会变化，定位应结合物理拓扑与驱动关系，而不是固定盘符。</p>
+<h2 id="dynamic-debug">8.2 Dynamic Debug</h2>
+<p>要求内核启用相应 Dynamic Debug 支持；若 debugfs
+未挂载，可在具备权限时执行：</p>
+<figure class="highlight sh"><table><tr><td class="code"><pre><span class="line">mount -t debugfs debugfs /sys/kernel/debug</span><br></pre></td></tr></table></figure>
+<p>优先按文件启用，避免一次打开整个 USB 子系统：</p>
+<figure class="highlight sh"><table><tr><td class="code"><pre><span class="line">CTRL=/sys/kernel/debug/dynamic_debug/control</span><br><span class="line"><span class="built_in">echo</span> <span class="string">&#x27;file drivers/usb/core/hub.c +p&#x27;</span> &gt; <span class="string">&quot;<span class="variable">$CTRL</span>&quot;</span></span><br><span class="line"><span class="built_in">echo</span> <span class="string">&#x27;file drivers/usb/core/hcd.c +p&#x27;</span> &gt; <span class="string">&quot;<span class="variable">$CTRL</span>&quot;</span></span><br><span class="line"><span class="built_in">echo</span> <span class="string">&#x27;file drivers/usb/dwc3/core.c +p&#x27;</span> &gt; <span class="string">&quot;<span class="variable">$CTRL</span>&quot;</span></span><br><span class="line"><span class="comment"># 实际走 Device 路径时再按需启用 gadget.c，Host 路径则关注 xHCI。</span></span><br><span class="line"><span class="comment"># 复现结束后撤销自己启用的规则：</span></span><br><span class="line"><span class="built_in">echo</span> <span class="string">&#x27;file drivers/usb/core/hub.c -p&#x27;</span> &gt; <span class="string">&quot;<span class="variable">$CTRL</span>&quot;</span></span><br><span class="line"><span class="built_in">echo</span> <span class="string">&#x27;file drivers/usb/core/hcd.c -p&#x27;</span> &gt; <span class="string">&quot;<span class="variable">$CTRL</span>&quot;</span></span><br><span class="line"><span class="built_in">echo</span> <span class="string">&#x27;file drivers/usb/dwc3/core.c -p&#x27;</span> &gt; <span class="string">&quot;<span class="variable">$CTRL</span>&quot;</span></span><br></pre></td></tr></table></figure>
+<p><code>hub.c</code> 通常属于 <code>usbcore</code>，不一定存在名为
+<code>hub</code> 的独立模块。文件规则比猜测模块名更可靠；Dynamic Debug
+只能启用已编入的调试调用点，不能凭空生成日志。大量 <code>printk()</code>
+和串口输出会改变时序并显著降低吞吐。</p>
+<h2 id="tracepoints-与-ftrace">8.3 Tracepoints 与 ftrace</h2>
+<p>先查询目标内核提供的事件，不能假设存在固定名称的 URB tracepoint：</p>
+<figure class="highlight sh"><table><tr><td class="code"><pre><span class="line"><span class="comment"># tracefs 尚未挂载时执行：</span></span><br><span class="line">mount -t tracefs tracefs /sys/kernel/tracing</span><br><span class="line">T=/sys/kernel/tracing</span><br><span class="line">grep -E <span class="string">&#x27;^(usb|xhci[^:]*|dwc3):&#x27;</span> <span class="string">&quot;<span class="variable">$T</span>/available_events&quot;</span></span><br></pre></td></tr></table></figure>
+<p>仅在独占的实验跟踪会话中使用下列示例；现有跟踪任务应使用 trace
+instance 隔离。事件名从 <code>available_events</code> 选择：</p>
+<figure class="highlight sh"><table><tr><td class="code"><pre><span class="line">T=/sys/kernel/tracing</span><br><span class="line">EVENT=<span class="string">&#x27;xhci-hcd:xhci_handle_event&#x27;</span>  <span class="comment"># 示例，须确认目标内核存在</span></span><br><span class="line"><span class="built_in">echo</span> 0 &gt; <span class="string">&quot;<span class="variable">$T</span>/tracing_on&quot;</span></span><br><span class="line"><span class="built_in">echo</span> &gt; <span class="string">&quot;<span class="variable">$T</span>/trace&quot;</span></span><br><span class="line"><span class="built_in">printf</span> <span class="string">&#x27;%s\n&#x27;</span> <span class="string">&quot;<span class="variable">$EVENT</span>&quot;</span> &gt; <span class="string">&quot;<span class="variable">$T</span>/set_event&quot;</span></span><br><span class="line"><span class="built_in">echo</span> 1 &gt; <span class="string">&quot;<span class="variable">$T</span>/tracing_on&quot;</span></span><br><span class="line"><span class="comment"># 在另一终端复现一次操作。</span></span><br><span class="line"><span class="built_in">echo</span> 0 &gt; <span class="string">&quot;<span class="variable">$T</span>/tracing_on&quot;</span></span><br><span class="line"><span class="built_in">cat</span> <span class="string">&quot;<span class="variable">$T</span>/trace&quot;</span> &gt; /tmp/usb-trace.txt</span><br><span class="line"><span class="built_in">printf</span> <span class="string">&#x27;!%s\n&#x27;</span> <span class="string">&quot;<span class="variable">$EVENT</span>&quot;</span> &gt;&gt; <span class="string">&quot;<span class="variable">$T</span>/set_event&quot;</span></span><br></pre></td></tr></table></figure>
+<p>重点关联请求入队、TRB 入队、Doorbell、IRQ、事件处理、完成回调和 PM
+变化。函数图跟踪应限制到少量函数；检查缓冲覆盖及丢失事件，不能把缺失日志直接视为硬件未执行。</p>
+<h2 id="usbmontcpdump-与-wireshark">8.4 usbmon、tcpdump 与
+Wireshark</h2>
+<p>Host 侧启用 <code>CONFIG_USB_MON</code>；若编译为模块，加载
+<code>usbmon</code>：</p>
+<figure class="highlight sh"><table><tr><td class="code"><pre><span class="line">modprobe usbmon</span><br><span class="line"><span class="built_in">ls</span> /sys/kernel/debug/usb/usbmon/</span><br><span class="line"><span class="comment"># 2u 表示总线 2，0u 表示所有总线；按实际总线替换。</span></span><br><span class="line"><span class="built_in">cat</span> /sys/kernel/debug/usb/usbmon/2u &gt; /tmp/usbmon.txt</span><br><span class="line"><span class="comment"># 或由支持 USB 抓取的 libpcap/tcpdump 生成 pcap，Ctrl-C 停止：</span></span><br><span class="line">tcpdump -D</span><br><span class="line">tcpdump -i usbmon2 -s 0 -w /tmp/usb-capture.pcap</span><br></pre></td></tr></table></figure>
+<p>文本记录中的关键字段：</p>
 <table>
+<colgroup>
+<col style="width: 50%">
+<col style="width: 50%">
+</colgroup>
 <thead>
 <tr class="header">
-<th>插入方向</th>
-<th>选中的高速 lane</th>
-<th>结果</th>
+<th>字段</th>
+<th>含义</th>
 </tr>
 </thead>
 <tbody>
 <tr class="odd">
-<td>正向</td>
-<td>正确 lane</td>
-<td>SuperSpeed Plus</td>
+<td>Tag</td>
+<td>URB 标识，用于关联一次提交和完成；对象后续可能被复用</td>
 </tr>
 <tr class="even">
-<td>正向</td>
-<td>错误 lane</td>
-<td>降为 High Speed</td>
+<td><code>S</code> / <code>C</code> / <code>E</code></td>
+<td>提交 / 完成回调 / 提交错误</td>
 </tr>
 <tr class="odd">
-<td>反向</td>
-<td>与方向匹配的 lane</td>
-<td>SuperSpeed Plus</td>
+<td><code>Ci/Co</code>、<code>Bi/Bo</code>、<code>Ii/Io</code>、<code>Zi/Zo</code></td>
+<td>Control、Bulk、Interrupt、Isochronous 及方向</td>
 </tr>
 <tr class="even">
-<td>反向</td>
-<td>不匹配的 lane</td>
-<td>降为 High Speed</td>
+<td><code>Bo:2:003:2</code></td>
+<td>总线 2、设备地址 3、端点 2 的 Bulk OUT</td>
+</tr>
+<tr class="odd">
+<td>Status / Length</td>
+<td>状态及该类记录对应的请求或实际长度</td>
 </tr>
 </tbody>
 </table>
-<p>分析重点：</p>
+<p>提交记录中的
+<code>-115</code>（<code>-EINPROGRESS</code>）通常只是“已提交、尚未完成”，应结合对应完成记录判断。URB
+Tag 必须结合时间顺序分析，不能跨复用周期简单配对。</p>
+<p><strong>usbmon 观察的是 Host 侧 URB，不是原始 TRB，也不是线上的每个
+USB 数据包。</strong> 它不能直接证明物理重试、链路训练或 TRB
+使用率；文本负载可能截断，二进制抓取也需核对捕获长度及丢包。Gadget
+故障可从对端 Host 抓包，并结合板端 DWC3
+trace；电气、握手与链路问题需要硬件协议分析仪。</p>
+<p>Windows 作为 Host 时可使用 USBPcap 配合
+Wireshark。抓取应尽量限定总线、设备和时间窗口，数据分享前去除序列号、路径、应用负载及其他标识。</p>
+<h2 id="debugfs-与-trb-分析">8.5 debugfs 与 TRB 分析</h2>
+<figure class="highlight sh"><table><tr><td class="code"><pre><span class="line"><span class="built_in">ls</span> /sys/kernel/debug/usb/xhci/</span><br><span class="line"><span class="built_in">ls</span> /sys/kernel/debug/usb/</span><br><span class="line"><span class="comment"># 主线 Linux 6.1/6.6 的 DWC3 目录以控制器设备名命名：</span></span><br><span class="line"><span class="built_in">ls</span> /sys/kernel/debug/usb/&lt;controller-device-name&gt;/</span><br></pre></td></tr></table></figure>
+<p>常见信息包括 xHCI 的 Command/Event/Endpoint Ring、端口
+<code>portsc</code>，以及 DWC3 的
+<code>regdump</code>、<code>lsp_dump</code> 和按能力创建的
+<code>mode</code>、<code>testmode</code>、<code>link_state</code>；Gadget
+端点子目录中可查看 <code>trb_ring</code> 等信息。DWC3 不使用统一的
+<code>usb/dwc3/</code> 目录；<code>&lt;controller-device-name&gt;</code>
+应替换为实际控制器设备名，目录和可用项以目标版本为准。</p>
+<p>分析时遵循：</p>
 <ul>
-<li>USB 2.0 D+/D- 与 SuperSpeed 差分对的连接/复用路径不同，所以高速 lane
-错误时仍可能枚举为 High Speed。</li>
-<li>“只有 HS”不能直接归因于 usbcore 或 UAS；应检查 Type-C CC
-方向、MUX/retimer、PHY orientation、lane 映射和
-<code>maximum-speed</code>/强制 Gen1 等限制。</li>
-<li><code>sysfs speed</code> 中的 <code>10000</code> 表示 10000 Mb/s，即
-10 Gb/s 链路速率，不等于应用层有效吞吐。</li>
+<li>先确认当前角色，再选择 xHCI 或 DWC3 Gadget 的描述符格式。</li>
+<li>同时查看生产者、消费者、Cycle/所有权、完成状态和端点状态；单次 Ring
+快照不等于历史轨迹。</li>
+<li>使用 tracepoint
+在描述符提交前后和完成时取证，比事后读取已回收槽位更可靠。</li>
+<li>自定义统计应记录有效载荷、数据 TRB、Link/控制
+TRB、在途请求数及高水位，避免重复计数。</li>
+<li>不得将 TRB 中的 DMA 地址强转为 CPU 指针后
+<code>readl()</code>；数据转储必须找到受生命周期保护的 CPU
+Buffer，并遵守 DMA 同步和边界约束。</li>
+<li>不应直接复用缺少卸载同步、指针寿命保护或长度校验的调试 Hook
+草稿。优先使用驱动内已有接口，限制输出内容和访问权限。</li>
 </ul>
-<hr>
-<h1 id="跨域虚拟-usb-与-adb-转发项目中最有深度的部分">6. 跨域虚拟 USB 与
-ADB 转发：项目中最有深度的部分</h1>
-<h2 id="虚拟-usb-驱动初始化">6.1 虚拟 USB 驱动初始化</h2>
-<p>工作记录中的 Linux 虚拟 USB 驱动主要完成：</p>
-<figure class="highlight text"><table><tr><td class="code"><pre><span class="line">virtual_usb_probe()</span><br><span class="line">  -&gt; 分配虚拟设备上下文</span><br><span class="line">  -&gt; usb_register_dev()             // 注册字符设备接口</span><br><span class="line">  -&gt; kthread_create(virt_usb_rx_loop)</span><br><span class="line">  -&gt; kthread_create(virt_usb_tx_loop)</span><br><span class="line">  -&gt; timer_setup(tx_timer_callback)</span><br></pre></td></tr></table></figure>
-<p>Bulk OUT 提交时使用 <code>usb_fill_bulk_urb()</code>，并将 URB 放入
-<code>submitted</code> anchor。dummy HCD/UDC 在 Linux 内形成 Host—Gadget
-回环：Gadget 数据可经 dummy UDC 到 dummy HCD，再由虚拟 USB Host
-驱动接收并转发到实时安全域，反向路径同理。</p>
-<p>dummy HCD 的初始化和传输路径可概括为：</p>
-<figure class="highlight text"><table><tr><td class="code"><pre><span class="line">dummy_hcd_init()</span><br><span class="line">  -&gt; 创建 HCD/UDC platform device</span><br><span class="line">  -&gt; 注册 dummy_hcd_driver / dummy_udc_driver</span><br><span class="line"></span><br><span class="line">dummy_hcd_probe()</span><br><span class="line">  -&gt; usb_create_hcd()</span><br><span class="line">  -&gt; usb_add_hcd()</span><br><span class="line"></span><br><span class="line">dummy_start()</span><br><span class="line">  -&gt; 初始化 dummy_timer</span><br><span class="line"></span><br><span class="line">dummy_timer()</span><br><span class="line">  -&gt; transfer()</span><br></pre></td></tr></table></figure>
-<p>这里要注意：dummy 控制器是软件模拟，不表示数据已经到达物理 USB
-线路上。跨域代理和物理 UDC 的状态同样必须纳入端到端错误处理。</p>
-<h2 id="真正的难点三种包不能混为一谈">6.2
-真正的难点：三种“包”不能混为一谈</h2>
-<p>原始记录指出：dummy 侧倾向聚合较大的传输块，而上层 ADB
-常见数据块更小；大文件传输时，如果不知道消息是否结束，就可能等待更多数据而造成卡顿。临时方案采用<strong>计数或超时强制发送</strong>。</p>
-<p>要深入分析，首先区分：</p>
+<h2 id="jtag-gdb">8.6 JTAG / GDB</h2>
 <ol type="1">
-<li><strong>USB packet</strong>：总线上的数据包，受
-<code>wMaxPacketSize</code> 等约束。</li>
-<li><strong>URB/request</strong>：Host 与 Gadget
-驱动的一次传输请求，可包含多个 USB packet。</li>
-<li><strong>ADB message</strong>：通常由固定长度 header 和可选 payload
-构成，命令包括
-<code>OPEN</code>、<code>OKAY</code>、<code>WRTE</code>、<code>CLSE</code>
-等。</li>
-<li><strong>跨域转发块</strong>：dummy/代理为减少跨核开销而聚合的数据块，其边界不一定与前三种一致。</li>
+<li>保留与运行镜像精确匹配的
+<code>vmlinux</code>、模块、配置及符号，启用调试信息，按需启用
+<code>CONFIG_GDB_SCRIPTS</code>。</li>
+<li>保持内核默认受支持的优化配置；<code>-Og/-O0</code>
+可能导致编译失败或行为变化，不应作为通用前提。局部调整须验证工具链和实际编译命令。</li>
+<li>地址随机化可在隔离实验中通过 <code>nokaslr</code>
+简化，或按实际重定位地址加载符号；内联、LTO
+和优化会影响源码单步与断点位置。</li>
+<li>CPU 停顿会使 USB
+时序、对端超时及系统监控行为失真；看门狗调整须遵循实验平台流程，不应带入生产配置。</li>
+<li>调试服务默认仅绑定本机或受控网络，不将调试端口开放到公共网络。</li>
 </ol>
-<p>如果不区分这四层，就容易把“ADB 命令已完整”“URB 已完成”和“USB 需要
-ZLP”错误地当成同一事件。</p>
-<h2 id="零长包zlp应如何准确解释">6.3 零长包（ZLP）应如何准确解释</h2>
-<p>ZLP 主要用于表示一个 USB 传输的结束条件。典型场景是：</p>
-<ul>
-<li>数据长度正好是端点最大包长的整数倍；</li>
-<li>协议要求以短包结束本次传输；</li>
-<li>因此末尾再发送一个零长包，使接收方能判断传输结束。</li>
-</ul>
-<p>它并不是“每隔几个 ADB 包固定发送一次”，也不能由底层 dummy
-驱动在不了解上层协议时随意插入。是否生成 ZLP，应由 USB 传输语义、request
-的 zero 标志和当前传输长度共同决定。</p>
-<p>面试中可把问题表述为：<strong>底层聚合提高吞吐，但上层依赖消息边界或传输结束条件，导致延迟与吞吐发生冲突。</strong></p>
-<h2 id="adb-pull-流程提供的边界信息">6.4 ADB Pull
-流程提供的边界信息</h2>
-<p>原始抓包记录可抽象为：</p>
-<figure class="highlight text"><table><tr><td class="code"><pre><span class="line">Host -&gt; OPEN</span><br><span class="line">Host -&gt; 文件 STAT/STA2 请求</span><br><span class="line">Device -&gt; 状态响应</span><br><span class="line">Host -&gt; RECV</span><br><span class="line">Device -&gt; DATA ...</span><br><span class="line">Device -&gt; 最后数据 + DONE</span><br><span class="line">Host -&gt; QUIT</span><br><span class="line">Device -&gt; CLSE</span><br><span class="line">Host -&gt; CLSE</span><br></pre></td></tr></table></figure>
-<p>其中 <code>WRTE</code> 可携带 ADB 消息 header 与
-payload，<code>DATA</code>、<code>DONE</code>
-等又属于同步文件服务子协议。说明转发层若只按字节流处理，就无法可靠识别“一个逻辑操作已经结束”。</p>
-<h2 id="从临时补丁到可维护方案">6.5 从临时补丁到可维护方案</h2>
-<p><strong>原方案</strong>：计数或计时达到阈值就 flush。</p>
-<ul>
-<li>优点：改动小，能缓解聚合造成的等待。</li>
-<li>缺点：负载变化时行为不稳定；计时过小降低吞吐，过大增加尾延迟；仍不能从根本上恢复协议边界。</li>
-</ul>
-<p><strong>建议方案</strong>：在虚拟通道层建立带边界的消息格式，而不是让
-dummy HCD 解析所有 ADB 业务。</p>
-<figure class="highlight text"><table><tr><td class="code"><pre><span class="line">跨域消息头建议包含：</span><br><span class="line">- channel_id：ADB、TTY 等逻辑通道</span><br><span class="line">- msg_type：DATA、FLUSH、RESET、FLOW_CONTROL、CLOSE</span><br><span class="line">- sequence：乱序/丢失检查与调试</span><br><span class="line">- payload_len：本消息有效载荷</span><br><span class="line">- flags：END_OF_TRANSFER、NEED_ZLP、LAST_FRAGMENT 等</span><br><span class="line">- credit/ack：反压与可靠性所需信息（按现有跨核协议设计）</span><br></pre></td></tr></table></figure>
-<p>推荐策略：</p>
-<ol type="1">
-<li><strong>协议感知的位置前移</strong>：由已经理解 ADB/Gadget request
-边界的层生成 flush 语义，dummy HCD 只负责传输。</li>
-<li><strong>有界聚合</strong>：同时设置字节高水位、最大等待时间和最大消息数，任何条件满足即发送。</li>
-<li><strong>结束事件立即
-flush</strong>：传输完成、命令结束、断开、挂起等事件不等待聚合阈值。</li>
-<li><strong>反压而不是无限排队</strong>：每个通道限制队列深度和内存占用，将
-credit 返给生产者。</li>
-<li><strong>分别处理控制与数据</strong>：CLOSE、RESET、FLOW_CONTROL
-不应排在大块数据后面。</li>
-<li><strong>保留兼容兜底</strong>：无法识别边界时仍可超时
-flush，但它是兜底，不是唯一机制。</li>
-</ol>
-<p>这部分在面试中要明确说明哪些是原记录中的临时方案，哪些是自己的设计建议，不能把建议说成已上线成果。</p>
-<h2 id="并发与退出路径同样重要">6.6 并发与退出路径同样重要</h2>
-<p>虚拟 USB 驱动至少存在以下执行上下文：</p>
-<ul>
-<li>USB URB completion；</li>
-<li>RX/TX kthread；</li>
-<li>flush timer；</li>
-<li>字符设备 read/write/ioctl；</li>
-<li>跨核消息回调；</li>
-<li>probe/disconnect/suspend/resume。</li>
-</ul>
-<p>建议用一张状态与所有权表约束实现：</p>
+<figure class="highlight sh"><table><tr><td class="code"><pre><span class="line">&lt;target-triplet&gt;-gdb /path/to/vmlinux</span><br></pre></td></tr></table></figure>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">target remote 127.0.0.1:3333</span><br><span class="line">hbreak dwc3_probe</span><br><span class="line">continue</span><br></pre></td></tr></table></figure>
+<p>硬件断点数量有限；函数名及断点是否可命中取决于符号、加载时机和 CPU
+状态。JTAG 适合定位死锁、异常和关键状态，不适合直接测量正常 USB
+实时性能。</p>
+<h1 id="功能测试">9 功能测试</h1>
+<h2 id="测试准备与判据">9.1 测试准备与判据</h2>
+<p>记录内核版本、配置、DTB、IP/PHY 版本、设备类型、线缆等级、Hub
+拓扑、供电条件和预期速率。区分“控制器出现”“设备完成枚举”“接口绑定”“功能可用”四个阶段。</p>
 <table>
 <colgroup>
 <col style="width: 33%">
@@ -1040,478 +1378,336 @@ flush，但它是兜底，不是唯一机制。</li>
 </colgroup>
 <thead>
 <tr class="header">
-<th>资源</th>
-<th>正常所有者</th>
-<th>disconnect 时的处理</th>
+<th>测试项</th>
+<th>覆盖内容</th>
+<th>通过判据</th>
 </tr>
 </thead>
 <tbody>
 <tr class="odd">
-<td>submitted URB</td>
-<td>HCD / completion callback</td>
-<td>阻止新提交，kill anchored URB，等待回调结束</td>
+<td>Host 枚举</td>
+<td>冷插入、热插拔、带设备启动、直连及多级 Hub</td>
+<td>预期速率、描述符和接口驱动正确，超时或重试不超过约定阈值</td>
 </tr>
 <tr class="even">
-<td>RX/TX 线程</td>
-<td>kthread</td>
-<td>设置退出状态、唤醒等待队列、<code>kthread_stop()</code></td>
+<td>设备类别</td>
+<td>HID、串口、存储、网络、音视频等</td>
+<td>功能正常，无持续错误、资源泄漏或内核告警</td>
 </tr>
 <tr class="odd">
-<td>flush timer</td>
-<td>timer core</td>
-<td><code>timer_delete_sync()</code>，防止退出后访问已释放上下文</td>
+<td>传输边界</td>
+<td>0、1、MPS−1、MPS、MPS+1、多包及大请求</td>
+<td>长度、短包、ZLP 和完成状态符合协议</td>
 </tr>
 <tr class="even">
-<td>字符设备</td>
-<td>open file 上下文</td>
-<td>与设备生命周期解耦，处理热拔后的 read/write</td>
+<td>Gadget</td>
+<td>UDC 绑定、配置选择、多个 Function、断连重连</td>
+<td>对端可枚举，端点方向和描述符一致，功能可用</td>
 </tr>
 <tr class="odd">
-<td>跨域消息</td>
-<td>proxy/channel</td>
-<td>注销回调、拒绝迟到消息、清理未完成请求</td>
+<td>DRD</td>
+<td>Host ↔︎ Device、空闲及受控负载下切换</td>
+<td>旧角色资源清理完成，新角色正确启用，无并发占用</td>
 </tr>
 <tr class="even">
-<td>队列 buffer</td>
-<td>生产者或消费者</td>
-<td>明确所有权转移，取消路径只能释放一次</td>
+<td>Type-C</td>
+<td>正反插、不同合规线缆和供电条件</td>
+<td>正反插达到预期速率，不异常降速，角色和供电正确</td>
+</tr>
+<tr class="odd">
+<td>Runtime PM</td>
+<td>空闲挂起、首个 I/O 恢复、远程唤醒</td>
+<td>无请求丢失、寄存器访问异常或恢复死锁</td>
+</tr>
+<tr class="even">
+<td>系统休眠</td>
+<td>空闲/业务场景挂起恢复、连接状态变化</td>
+<td>恢复后设备状态及业务符合设计，无异常复位循环</td>
+</tr>
+<tr class="odd">
+<td>异常恢复</td>
+<td>传输中断连、设备超时、受控子系统重启</td>
+<td>错误可上报，在途请求收敛，重新连接后恢复</td>
+</tr>
+<tr class="even">
+<td>稳定性</td>
+<td>约定次数的插拔/切换/休眠循环和长时运行</td>
+<td>成功率达标，无持续内存增长、DMA 泄漏或不可恢复故障</td>
 </tr>
 </tbody>
 </table>
-<p>常见崩溃原因不是“链表不会用”，而是 disconnect、timer、callback 和
-kthread 并发退出导致 use-after-free、重复释放或回调重提交。</p>
-<hr>
-<h1 id="runtime-pmstr-与恢复设计">7. Runtime PM、STR 与恢复设计</h1>
-<h2 id="runtime-pm-的引用计数必须成对">7.1 Runtime PM
-的引用计数必须成对</h2>
-<p>工作记录中的恢复路径：</p>
-<figure class="highlight text"><table><tr><td class="code"><pre><span class="line">usb_autoresume_device()</span><br><span class="line">  -&gt; pm_runtime_get_sync()</span><br><span class="line">  -&gt; 先恢复父设备，再执行设备 runtime_resume</span><br><span class="line">  -&gt; usb_runtime_resume()</span><br><span class="line">     -&gt; usb_resume_device()</span><br><span class="line">     -&gt; 遍历并恢复 Interface</span><br></pre></td></tr></table></figure>
-<p>恢复后通过 <code>usb_autosuspend_device()</code> 更新 last busy
-并减少引用计数。工程上应检查：</p>
+<p>针对 64 KiB 边界、分散-聚集列表（scatterlist）、多 TRB
+请求和队列深度变化补充传输测试。LS/FS
+兼容性应使用对应设备，不能仅靠将高速设备降速替代。</p>
+<h2 id="存储与数据一致性">9.2 存储与数据一致性</h2>
 <ul>
-<li>每条成功、失败路径是否都平衡 <code>pm_runtime_get/put</code>；</li>
-<li>Interface probe、disconnect、reset_resume 是否围绕 runtime PM
-正确串行化；</li>
-<li>远程唤醒是否被控制器、root hub 和设备配置共同允许；</li>
-<li>resume 失败后是否错误地继续访问尚未恢复的寄存器或 URB。</li>
+<li>使用专用测试介质，先确认盘符、挂载点和可用空间；测试命令不应指向系统盘或未知裸设备。</li>
+<li>对测试文件执行写入、同步、读取和哈希校验；重连后再次校验，避免只验证缓存中的数据。</li>
+<li>正常移除顺序为：停止业务 → 同步并成功卸载全部相关挂载 →
+按平台支持执行安全移除 → 物理断开。</li>
+<li>日志中出现 SCSI Cache Flush/Synchronize Cache
+失败时，不能仅因随后出现 disconnect 就认定“安全弹出成功”。</li>
+<li>意外拔出测试只在可丢弃数据的介质进行，并单独记录文件系统及恢复行为。</li>
 </ul>
-<p>日志反复出现
-<code>suspend raced with wakeup event</code>，表示挂起与唤醒发生竞争，系统随后
-auto-resume。它可能是正常竞争恢复，也可能由持续端口事件、错误 wake
-配置或 PHY 状态抖动放大，需要结合事件频率和 PORTSC change 位判断。</p>
-<h2 id="str-不等于-runtime-suspend">7.2 STR 不等于 runtime suspend</h2>
-<p>STR 是系统级状态保存与恢复，可能同时影响：</p>
+<h2 id="usbtest-与软件环回">9.3 usbtest 与软件环回</h2>
+<p><code>CONFIG_USB_TEST</code> 提供 Host 侧 <code>usbtest</code>
+驱动。对端需提供匹配的测试端点和协议，例如支持 SourceSink/Loopback
+的测试 Gadget；用户态测试程序常见于目标内核的
+<code>tools/usb/</code>。</p>
+<p>建议覆盖控制、Bulk、分散-聚集列表（scatterlist）、排队、取消、短包及错误处理。先检查工具帮助及驱动匹配条件，不应将测试驱动强行绑定普通存储或生产设备。等时等项目需确认工具和对端明确支持。</p>
+<p><code>dummy_hcd</code>
+可用于软件回归及请求生命周期验证，但不能替代真实 DWC3、PHY、Type-C
+和电源管理测试。</p>
+<h2 id="gadget-adb-验证">9.4 Gadget / ADB 验证</h2>
+<ol type="1">
+<li>确认控制器处于 Device 角色且 UDC 存在。</li>
+<li>检查 configfs 的描述符、Configuration、Function 链接及 UDC
+绑定；FunctionFS 场景还需检查用户态服务是否已就绪。</li>
+<li>在对端检查接口和驱动，分别验证
+shell、单文件、大文件、小文件批量及双向传输。</li>
+<li>对不同边界长度和断连重连执行哈希校验；出现停滞时，同时观察 Host
+URB、Gadget Request 和代理队列。</li>
+<li>按需使用 <code>ADB_TRACE=usb,sync</code>
+等客户端日志选项，具体类别以工具版本为准；USB
+之外的认证、服务端或文件系统错误应独立定位。</li>
+</ol>
+<h1 id="性能测试与瓶颈定位">10 性能测试与瓶颈定位</h1>
+<h2 id="测试原则与指标">10.1 测试原则与指标</h2>
+<p>将测试分为
+<strong>链路/端点能力、存储块层能力、文件系统能力、应用端到端能力</strong>，避免将外设介质或协议性能等同于
+DWC3 性能。</p>
+<p>至少记录：</p>
 <ul>
-<li>时钟、复位和电源域；</li>
-<li>PHY 与 Type-C role/orientation；</li>
-<li>xHCI/DWC3 寄存器和内存环状态；</li>
-<li>IOMMU 映射；</li>
-<li>Gadget Function 与跨域代理；</li>
-<li>外设在休眠期间发生的插拔。</li>
+<li>协商速率、使用通道数、端点属性、UAS/BOT、请求大小及实际并发深度。</li>
+<li>吞吐、IOPS、平均及 P95/P99 延迟、CPU
+占用、IRQ/软中断负载、错误及重试。</li>
+<li>设备温度、运行时长、CPU/总线频率和电源策略；存储还需记录缓存和持续写入衰减。</li>
 </ul>
-<p>设计时要明确：是保持 USB 唤醒能力，还是彻底断电后重新枚举；哪些状态由
-HCD 保存，哪些由 vendor 平台驱动恢复；跨域对端在 Linux
-域休眠期间如何处理物理端口事件。</p>
-<h2 id="外部复位-linux-域前的-usb-处理">7.3 外部复位 Linux 域前的 USB
-处理</h2>
-<p>工作记录中，外部系统触发主处理器复位前，会调用已注册的外设复位回调，USB
-侧执行停止控制器活动、等待状态停止并屏蔽中断等动作。</p>
-<p>这体现了一个重要原则：<strong>处理器复位不等于外设自动进入安静状态</strong>。若不处理，可能出现：</p>
+<p>关闭大范围动态日志、抓包和重型
+trace，先取得无跟踪基线；排障时开启短窗口采样，再复测确认观测开销。</p>
+<h2 id="顺序读写快速检查">10.2 顺序读写快速检查</h2>
+<p>以下仅向<strong>专用测试盘上已确认的目录</strong>写入一个新文件，不写裸块设备。先确认该路径确实挂载在目标
+USB 盘，而非根文件系统、tmpfs 或其他设备：</p>
+<figure class="highlight sh"><table><tr><td class="code"><pre><span class="line">TEST_DIR=/mnt/usb-test</span><br><span class="line">findmnt -T <span class="string">&quot;<span class="variable">$TEST_DIR</span>&quot;</span></span><br><span class="line"><span class="built_in">df</span> -h <span class="string">&quot;<span class="variable">$TEST_DIR</span>&quot;</span></span><br><span class="line"><span class="comment"># 确认挂载源、空间及文件系统支持 O_DIRECT 后继续。</span></span><br><span class="line">TEST_FILE=$(<span class="built_in">mktemp</span> <span class="string">&quot;<span class="variable">$TEST_DIR</span>/dwc3-seq.XXXXXX&quot;</span>)</span><br><span class="line"><span class="built_in">dd</span> <span class="keyword">if</span>=/dev/zero of=<span class="string">&quot;<span class="variable">$TEST_FILE</span>&quot;</span> bs=4M count=1024 \</span><br><span class="line">   oflag=direct conv=fsync status=progress</span><br><span class="line"><span class="built_in">dd</span> <span class="keyword">if</span>=<span class="string">&quot;<span class="variable">$TEST_FILE</span>&quot;</span> of=/dev/null bs=4M iflag=direct status=progress</span><br></pre></td></tr></table></figure>
 <ul>
-<li>控制器继续 DMA 到已失效内存；</li>
-<li>中断在 GIC/系统重建期间误触发；</li>
-<li>PHY/Type-C 与重新启动的软件状态不一致；</li>
-<li>对端仍认为链路在线，恢复后无法重新枚举。</li>
+<li>测试量为 4 GiB，应按容量、文件系统限制及持续性能目标调整。</li>
+<li><code>O_DIRECT</code>
+尽量绕过主机页缓存，但不绕过设备缓存；须满足文件系统和设备的长度、地址及偏移对齐约束。</li>
+<li>全零数据可能被压缩或优化，<code>dd</code>
+仅用于快速检查，不作为唯一吞吐结论。</li>
+<li><code>dd</code> 不提供充分的队列深度、尾延迟和一致性信息；不支持
+<code>O_DIRECT</code> 时须明确标注替代方法及缓存影响。</li>
 </ul>
-<h2 id="不同重置手段的语义">7.4 不同“重置”手段的语义</h2>
+<h2 id="fio-基准">10.3 fio 基准</h2>
+<p>使用新的文件路径，确认预留空间至少满足测试数据量。以下写入 4 GiB
+不重复测试数据并同步，随后对同一文件进行只读基准：</p>
+<figure class="highlight sh"><table><tr><td class="code"><pre><span class="line">TEST_DIR=/mnt/usb-test</span><br><span class="line">findmnt -T <span class="string">&quot;<span class="variable">$TEST_DIR</span>&quot;</span></span><br><span class="line"><span class="built_in">df</span> -h <span class="string">&quot;<span class="variable">$TEST_DIR</span>&quot;</span></span><br><span class="line">TEST_FILE=$(<span class="built_in">mktemp</span> <span class="string">&quot;<span class="variable">$TEST_DIR</span>/dwc3-fio.XXXXXX&quot;</span>)</span><br><span class="line"></span><br><span class="line">fio --name=seq-write --filename=<span class="string">&quot;<span class="variable">$TEST_FILE</span>&quot;</span> --size=4G \</span><br><span class="line">    --rw=write --bs=1M --ioengine=libaio --iodepth=16 \</span><br><span class="line">    --direct=1 --numjobs=1 --refill_buffers=1 --end_fsync=1 \</span><br><span class="line">    --group_reporting</span><br><span class="line"></span><br><span class="line">fio --name=seq-read --filename=<span class="string">&quot;<span class="variable">$TEST_FILE</span>&quot;</span> --size=4G \</span><br><span class="line">    --rw=<span class="built_in">read</span> --bs=1M --ioengine=libaio --iodepth=16 \</span><br><span class="line">    --direct=1 --numjobs=1 --<span class="built_in">readonly</span> --allow_file_create=0 \</span><br><span class="line">    --time_based --runtime=60 --ramp_time=5 --group_reporting</span><br><span class="line"></span><br><span class="line">fio --name=rand-read --filename=<span class="string">&quot;<span class="variable">$TEST_FILE</span>&quot;</span> --size=4G \</span><br><span class="line">    --rw=randread --bs=4k --ioengine=libaio --iodepth=32 \</span><br><span class="line">    --direct=1 --numjobs=1 --<span class="built_in">readonly</span> --allow_file_create=0 \</span><br><span class="line">    --time_based --runtime=60 --ramp_time=5 --group_reporting</span><br></pre></td></tr></table></figure>
+<p>应在写入成功后执行读取。<code>libaio</code> 及直接 I/O
+的可用性取决于目标系统；检查 fio 报告中的实际深度分布。改变 I/O
+引擎、块大小或并发后应重新标注，不得将不等价参数直接对比。</p>
+<p>建议矩阵：</p>
 <table>
-<colgroup>
-<col style="width: 33%">
-<col style="width: 33%">
-<col style="width: 33%">
-</colgroup>
 <thead>
 <tr class="header">
-<th>操作</th>
-<th>影响范围</th>
-<th>注意事项</th>
+<th>维度</th>
+<th>建议取值</th>
 </tr>
 </thead>
 <tbody>
 <tr class="odd">
-<td>设备 <code>authorized = 0/1</code></td>
-<td>禁止/重新授权设备并触发相应处理</td>
-<td>不等于所有场景下的物理端口复位</td>
+<td>工作负载</td>
+<td>顺序读/写、4 KiB 随机读/写、约定比例混合读写</td>
 </tr>
 <tr class="even">
-<td>root hub <code>authorized = 0/1</code></td>
-<td>影响整棵 USB 总线</td>
-<td>影响面大，存储和调试通道可能同时断开</td>
+<td>请求大小</td>
+<td>4 KiB、64 KiB、256 KiB、1 MiB</td>
 </tr>
 <tr class="odd">
-<td>USB remove</td>
-<td>逻辑移除设备</td>
-<td>应先停止 I/O，不能代替正常安全弹出</td>
+<td>队列深度</td>
+<td>1、4、16、32，结合实际协议能力</td>
 </tr>
 <tr class="even">
-<td>driver unbind/bind</td>
-<td>重建某驱动与设备关系</td>
-<td>必须处理依赖驱动和仍在使用的资源</td>
+<td>连接条件</td>
+<td>USB 2.0 / 3.x、直连/Hub、Type-C 正反插</td>
 </tr>
 <tr class="odd">
-<td>Port reset/warm reset</td>
-<td>链路/设备级恢复</td>
-<td>SuperSpeed 与普通 USB 2 端口语义不同</td>
+<td>持续时间</td>
+<td>预热后短时基线与越过设备缓存的持续测试</td>
 </tr>
 <tr class="even">
-<td>控制器复位</td>
-<td>整个 HCD/PHY 状态重建</td>
-<td>应保存必要上下文并防止 DMA/IRQ 残留</td>
+<td>对照方式</td>
+<td>同一外设在参考主机、同一平台使用参考外设</td>
 </tr>
 </tbody>
 </table>
-<p>原文特别提醒，直接解绑 PHY 可能无法恢复，而 Type-C、PHY、DWC3
-之间存在通知和依赖关系。因此，恢复方案必须设计顺序，而不是把 unbind/bind
-当万能命令。</p>
-<hr>
-<h1 id="分层调试体系">8. 分层调试体系</h1>
-<h2 id="先确定问题层级再开日志">8.1 先确定问题层级，再开日志</h2>
+<p>每组至少重复三次，报告中位值和波动范围。完整性测试另用 fio
+<code>verify</code>
+或重连后的文件哈希校验，不以吞吐测试替代；验证功能也可能引入 CPU 和 I/O
+开销，应单独报告。</p>
+<h2 id="性能上限与定位">10.4 性能上限与定位</h2>
+<ul>
+<li>5 Gbit/s 链路采用 8b/10b 编码，编码后的字节率上限约 500
+MB/s，尚未扣除 USB 协议和实现开销。</li>
+<li>10 Gbit/s 单通道采用 128b/132b 编码，对应约 1.21
+GB/s，同样不是应用吞吐保证。</li>
+<li>以上为十进制单位的理论估算，不是验收阈值；实际指标应结合控制器、PHY、介质和产品预算制定。</li>
+</ul>
 <table>
 <colgroup>
-<col style="width: 33%">
-<col style="width: 33%">
-<col style="width: 33%">
+<col style="width: 50%">
+<col style="width: 50%">
 </colgroup>
 <thead>
 <tr class="header">
 <th>现象</th>
-<th>首选证据</th>
-<th>初步方向</th>
+<th>优先检查</th>
 </tr>
 </thead>
 <tbody>
 <tr class="odd">
-<td>没有 xHCI 注册日志</td>
-<td>dmesg、设备树、clock/reset/PHY/IOMMU</td>
-<td>platform probe 或依赖失败</td>
+<td>SuperSpeed 设备仅以 HS 连接</td>
+<td>线缆、连接器、方向路径、PHY、Hub、设备树速度上限</td>
 </tr>
 <tr class="even">
-<td>root hub 存在，插入无事件</td>
-<td>PORTSC、Type-C、VBUS、PHY、IRQ</td>
-<td>链路检测与端口状态</td>
+<td>顺序性能正常，小块随机差</td>
+<td>BOT/UAS、实际队列深度、介质延迟、应用同步策略</td>
 </tr>
 <tr class="odd">
-<td>只有 High Speed</td>
-<td>speed、PORTSC、orientation、协商日志</td>
-<td>lane/MUX/PHY/速率限制/信号完整性</td>
+<td>CPU 占满而带宽低</td>
+<td>小包频率、内存拷贝、代理线程、日志、IRQ/软中断和 DMA/IOMMU 开销</td>
 </tr>
 <tr class="even">
-<td>描述符读取失败</td>
-<td>usbmon EP0、hub_port_init、复位状态</td>
-<td>枚举与控制传输</td>
+<td>启动快、持续写入后下降</td>
+<td>介质缓存耗尽、温控、垃圾回收、供电和文件系统</td>
 </tr>
 <tr class="odd">
-<td>枚举成功但没有类驱动</td>
-<td>sysfs Interface、id 匹配、绑定关系</td>
-<td>配置/Interface/probe</td>
+<td>队列增大但吞吐不变</td>
+<td>协议串行化、端点/Ring 供给不足、设备能力或链路已饱和</td>
 </tr>
 <tr class="even">
-<td>UAS 正常但没有盘</td>
-<td>SCSI INQUIRY、Sense、READ CAPACITY</td>
-<td>SCSI 扫描或 sd 阶段</td>
-</tr>
-<tr class="odd">
-<td>大数据卡顿</td>
-<td>URB S/C 时间差、队列深度、flush 日志</td>
-<td>聚合、反压、ZLP、跨域等待</td>
-</tr>
-<tr class="even">
-<td>热拔后崩溃</td>
-<td>anchor、线程/timer 退出栈、KASAN</td>
-<td>生命周期竞争</td>
-</tr>
-<tr class="odd">
-<td>suspend/resume 循环</td>
-<td>PORTSC change、wake、runtime PM 引用</td>
-<td>wakeup 竞争或状态未清</td>
+<td>吞吐周期性停顿</td>
+<td>PM、超时刷新、任务调度、回写、错误恢复或链路问题</td>
 </tr>
 </tbody>
 </table>
-<p>原则是先低开销地圈定层次，再开启更重的 xHCI/TRB
-日志。高速传输路径全量 <code>pr_info</code>
-会改变时序，甚至制造新的卡顿。</p>
-<h2 id="dynamic-debug">8.2 Dynamic Debug</h2>
-<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">mountpoint /sys/kernel/debug || mount -t debugfs none /sys/kernel/debug</span><br><span class="line"></span><br><span class="line"><span class="built_in">echo</span> <span class="string">&#x27;file drivers/usb/core/hub.c +p&#x27;</span>      &gt; /sys/kernel/debug/dynamic_debug/control</span><br><span class="line"><span class="built_in">echo</span> <span class="string">&#x27;file drivers/usb/core/hcd.c +p&#x27;</span>      &gt; /sys/kernel/debug/dynamic_debug/control</span><br><span class="line"><span class="built_in">echo</span> <span class="string">&#x27;file drivers/usb/storage/uas.c +p&#x27;</span>   &gt; /sys/kernel/debug/dynamic_debug/control</span><br><span class="line"><span class="built_in">echo</span> <span class="string">&#x27;file drivers/scsi/sd.c +p&#x27;</span>           &gt; /sys/kernel/debug/dynamic_debug/control</span><br><span class="line"><span class="built_in">echo</span> <span class="string">&#x27;file drivers/usb/vendor/*.c +p&#x27;</span>      &gt; /sys/kernel/debug/dynamic_debug/control</span><br><span class="line"></span><br><span class="line"> xHCI 日志量大，确认需要后再开</span><br><span class="line"><span class="built_in">echo</span> <span class="string">&#x27;file drivers/usb/host/xhci*.c +p&#x27;</span>    &gt; /sys/kernel/debug/dynamic_debug/control</span><br><span class="line"></span><br><span class="line"> 关闭示例</span><br><span class="line"><span class="built_in">echo</span> <span class="string">&#x27;file drivers/usb/host/xhci*.c -p&#x27;</span>    &gt; /sys/kernel/debug/dynamic_debug/control</span><br></pre></td></tr></table></figure>
-<p>内建进 <code>usbcore</code> 的源文件，使用 <code>file</code>
-过滤通常比猜测模块名更可靠。还可以在关键函数临时加入
-<code>dump_stack()</code> 验证真实调用路径，但不应保留在高频数据面。</p>
-<h2 id="tracepoint">8.3 Tracepoint</h2>
-<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">TRACE=/sys/kernel/tracing</span><br><span class="line"></span><br><span class="line"><span class="built_in">cat</span> <span class="variable">$TRACE</span>/available_events | grep -E <span class="string">&#x27;^(usb|xhci|dwc3):&#x27;</span></span><br><span class="line"><span class="built_in">echo</span> 0 &gt; <span class="variable">$TRACE</span>/tracing_on</span><br><span class="line"><span class="built_in">echo</span> &gt; <span class="variable">$TRACE</span>/trace</span><br><span class="line"></span><br><span class="line"><span class="built_in">echo</span> 1 &gt; <span class="variable">$TRACE</span>/events/usb/usb_submit_urb/enable</span><br><span class="line"><span class="built_in">echo</span> 1 &gt; <span class="variable">$TRACE</span>/events/usb/usb_complete_urb/enable</span><br><span class="line"> 按需开启整个模块事件</span><br><span class="line"> <span class="built_in">echo</span> 1 &gt; <span class="variable">$TRACE</span>/events/xhci/enable</span><br><span class="line"> <span class="built_in">echo</span> 1 &gt; <span class="variable">$TRACE</span>/events/dwc3/enable</span><br><span class="line"></span><br><span class="line"><span class="built_in">echo</span> 1 &gt; <span class="variable">$TRACE</span>/tracing_on</span><br><span class="line"> 执行一次插拔、枚举或数据传输</span><br><span class="line"><span class="built_in">sleep</span> 1</span><br><span class="line"><span class="built_in">echo</span> 0 &gt; <span class="variable">$TRACE</span>/tracing_on</span><br><span class="line"><span class="built_in">cat</span> <span class="variable">$TRACE</span>/trace</span><br></pre></td></tr></table></figure>
-<p>相比无差别打印，tracepoint 更适合分析 URB
-提交/完成延迟和事件顺序，但仍要控制事件量与 ring buffer 覆盖问题。</p>
-<h2 id="usbmon-与抓包">8.4 usbmon 与抓包</h2>
-<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">modprobe usbmon</span><br><span class="line"><span class="built_in">ls</span> /sys/kernel/debug/usb/usbmon/</span><br><span class="line"></span><br><span class="line"> 文本格式，0u 表示所有总线</span><br><span class="line"><span class="built_in">cat</span> /sys/kernel/debug/usb/usbmon/0u</span><br><span class="line"></span><br><span class="line"> 需要 Wireshark 分析时，可抓取 pcap</span><br><span class="line"> tcpdump -i usbmon0 -w usb_capture.pcap</span><br></pre></td></tr></table></figure>
-<p>基本格式：</p>
-<figure class="highlight text"><table><tr><td class="code"><pre><span class="line">URB Tag  Timestamp  Event  Address  Status  Length  Data</span><br></pre></td></tr></table></figure>
+<p>可结合
+<code>iostat -x 1</code>、<code>mpstat -P ALL 1</code>、<code>pidstat</code>、<code>/proc/interrupts</code>
+和短窗口 <code>perf</code>/trace 逐层定位。不要仅凭增加 Ring 或 Buffer
+大小就认定完成优化，应同时验证尾延迟、CPU、内存占用及异常恢复。</p>
+<h1 id="常见故障与恢复边界">11 常见故障与恢复边界</h1>
+<table>
+<colgroup>
+<col style="width: 50%">
+<col style="width: 50%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>故障表现</th>
+<th>排查路径</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>无控制器或 UDC 节点</td>
+<td>实际 DTB、节点状态、Kconfig、驱动匹配、资源及 Probe 失败</td>
+</tr>
+<tr class="even">
+<td>有 Root Hub，无外设事件</td>
+<td>数据角色、VBUS、连接器、PHY、线缆、中断和端口状态</td>
+</tr>
+<tr class="odd">
+<td>描述符读取失败或枚举循环</td>
+<td>供电、信号质量、复位时序、EP0、DMA、描述符和兼容性</td>
+</tr>
+<tr class="even">
+<td>USB 已枚举，无块设备</td>
+<td>接口绑定、UAS/BOT、SCSI 命令、LUN 扫描及 <code>sd</code></td>
+</tr>
+<tr class="odd">
+<td>URB 持续未完成</td>
+<td>设备是否响应、请求终止条件、Transfer Ring、Doorbell、IRQ/Event
+Ring、PM</td>
+</tr>
+<tr class="even">
+<td>ADB 大文件停滞</td>
+<td>应用流控、短包/ZLP、FunctionFS、代理聚合与背压、完成回调</td>
+</tr>
+<tr class="odd">
+<td>正反插仅一侧达到预期速率</td>
+<td>CC 方向事件、switch/mux、PHY Lane 路径和板级布线</td>
+</tr>
+<tr class="even">
+<td>恢复后异常或非法访问</td>
+<td>电源恢复顺序、通知回调、异步任务、旧 DMA 及对象生命周期</td>
+</tr>
+</tbody>
+</table>
+<p>常见状态应结合上下文判断：<code>-EPIPE</code> 可能表示端点
+STALL；<code>-EPROTO/-EILSEQ</code> 涉及协议或传输错误，不单独证明 PHY
+故障；<code>-ETIMEDOUT</code> 表示等待超时；取消和断开时的
+<code>-ENOENT/-ECONNRESET/-ESHUTDOWN</code> 可能是正常清理结果。</p>
+<p>恢复手段不可混淆：</p>
+<table>
+<colgroup>
+<col style="width: 50%">
+<col style="width: 50%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>操作</th>
+<th>真实语义与限制</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>authorized=0/1</code></td>
+<td>撤销/恢复设备授权及相关配置处理，不等于物理端口复位或控制器复位</td>
+</tr>
+<tr class="even">
+<td>接口驱动 unbind/bind</td>
+<td>重做功能驱动绑定，不一定重新枚举整个设备</td>
+</tr>
+<tr class="odd">
+<td><code>usb_reset_device()</code></td>
+<td>USB 设备级复位，需遵守接口锁定及 pre/post-reset 等要求</td>
+</tr>
+<tr class="even">
+<td>Hub Port Reset / Warm Reset</td>
+<td>针对端口及链路状态的协议操作，适用条件不同</td>
+</tr>
+<tr class="odd">
+<td>DWC3/xHCI unbind/bind</td>
+<td>控制器级拆除和重建，影响其全部下游设备及角色资源</td>
+</tr>
+<tr class="even">
+<td>硬件复位/断电</td>
+<td>依赖平台电源和复位设计，必须停止 DMA 并协调其他所有者</td>
+</tr>
+</tbody>
+</table>
+<p>控制器恢复前，应停止业务、成功卸载存储、解绑 Gadget，并同步
+Type-C/Role/PHY 通知及异步工作。使用 USB
+根文件系统或依赖该控制器维持管理连接时，不应直接拆除控制器。</p>
+<p>最终修复应解释根因并通过功能、性能、PM
+和异常回归；重试、重新授权、关闭低功耗或增大超时只能作为诊断对照或有依据的兼容措施。</p>
+<h1 id="参考资料">12 参考资料</h1>
 <ul>
-<li><code>S</code>：submission；<code>C</code>：callback/completion；<code>E</code>：submission
-error。</li>
-<li><code>Bo:2:003:2</code>：Bulk OUT，总线 2，设备地址 3，端点 2。</li>
-<li><code>Bi</code> 是 Bulk IN，<code>Ci/Co</code> 是 Control
-IN/OUT。</li>
-<li><code>-115</code> 即
-<code>-EINPROGRESS</code>，在提交记录中通常表示尚未完成，不是失败。</li>
-<li>应通过相同 URB Tag 配对
-S/C，计算完成时延并观察顺序，而不是只看单条日志。</li>
+<li>Linux
+内核文档：<code>Documentation/driver-api/usb/</code>、<code>Documentation/usb/</code>，重点关注
+URB、Gadget、usbmon 和电源管理。</li>
+<li>Dynamic
+Debug：<code>Documentation/admin-guide/dynamic-debug-howto.rst</code>。</li>
+<li>Trace/ftrace：<code>Documentation/trace/</code>。</li>
+<li>设备树
+Binding：<code>Documentation/devicetree/bindings/usb/snps,dwc3.yaml</code>、对应
+SoC Glue、PHY 和 Type-C Binding。</li>
+<li>设备树规范：<a href="https://www.devicetree.org/specifications/" class="uri">https://www.devicetree.org/specifications/</a>。</li>
+<li>USB 2.0/3.x、Type-C、USB PD 和 xHCI
+规范：使用与实际硬件能力匹配的版本。</li>
+<li>对应修订的 DWC3 IP 编程手册、PHY
+手册和芯片勘误：用于确认寄存器、时序及
+Quirk，不以其他平台的调试记录替代。</li>
 </ul>
-<p>工作记录还使用 usbmon
-还原了设备描述符、BOS、配置、字符串、SET_CONFIGURATION、SCSI
-INQUIRY/READ CAPACITY 和 ADB <code>OPEN/OKAY/WRTE</code>
-等过程。这种方法能把“驱动猜测”转化为协议证据。</p>
-<h2 id="xhcidwc3-debugfs-与-trb">8.5 xHCI/DWC3 debugfs 与 TRB</h2>
-<p>典型节点包括：</p>
-<figure class="highlight text"><table><tr><td class="code"><pre><span class="line">/sys/kernel/debug/usb/xhci/&lt;controller&gt;/command-ring/&#123;trbs,enqueue,dequeue,cycle&#125;</span><br><span class="line">/sys/kernel/debug/usb/xhci/&lt;controller&gt;/event-ring/&#123;trbs,enqueue,dequeue,cycle&#125;</span><br><span class="line">/sys/kernel/debug/usb/xhci/&lt;controller&gt;/ports/portXX/portsc</span><br><span class="line"></span><br><span class="line">/sys/kernel/debug/dwc3/&lt;controller&gt;/&lt;endpoint&gt;/trb_ring</span><br><span class="line">/sys/kernel/debug/dwc3/&lt;controller&gt;/&lt;endpoint&gt;/tx_fifo_size</span><br><span class="line">/sys/kernel/debug/dwc3/&lt;controller&gt;/&lt;endpoint&gt;/rx_fifo_size</span><br></pre></td></tr></table></figure>
-<p>分析重点：</p>
-<ul>
-<li>enqueue/dequeue 是否推进；</li>
-<li>cycle 是否与生产/消费状态匹配；</li>
-<li>Event Ring 是否有新事件；</li>
-<li>端口是否 Connected、Enabled、Link U0；</li>
-<li>某个端点是否持续排队但没有完成事件；</li>
-<li>TRB 长度之和是否与 URB/TD 预期一致。</li>
-</ul>
-<h2 id="jtaggdb-调试内核">8.6 JTAG/GDB 调试内核</h2>
-<p>工作记录中的经验可归纳为：</p>
-<ol type="1">
-<li>使用与运行内核完全匹配的 <code>vmlinux</code> 和符号文件。</li>
-<li>开启内核调试信息及 GDB scripts；需要源码级断点时关闭 KASLR。</li>
-<li>全局 <code>-O2/-Os</code> 下 static
-函数可能内联、变量可能优化掉，优先对目标模块使用
-<code>ccflags-y += -Og -g</code>，避免全局 <code>-O0/-Og</code>
-引入构建或时序问题。</li>
-<li>用符号和反汇编确认断点位置，不要硬编码另一版本的地址。</li>
-<li>多核暂停可能触发外部看门狗复位；测试环境需有受控的看门狗处理方案，量产系统不能简单屏蔽安全机制。</li>
-<li>JTAG
-适合分析死锁、寄存器状态和优化后的真实执行流；普通枚举问题仍应先用日志和抓包。</li>
-</ol>
-<hr>
-<h1 id="对原始-trb-debugfs-示例的代码审查">9. 对原始 TRB debugfs
-示例的代码审查</h1>
-<p>原文附录尝试通过 debugfs hook 和外部模块 dump
-TRB。这一思路便于实验，但直接产品化有明显风险，面试中主动指出这些问题能体现代码审查能力。</p>
-<h2 id="dma-地址与-cpu-地址混用">9.1 DMA 地址与 CPU 地址混用</h2>
-<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="comment">/* 错误思路：TRB 中保存的是 DMA 地址 */</span></span><br><span class="line">dma = trb[i].bpl | ((u64)trb[i].bph &lt;&lt; <span class="number">32</span>);</span><br><span class="line">readl((<span class="type">void</span> *)(<span class="type">uintptr_t</span>)dma);  <span class="comment">/* 不可作为通用调试方法 */</span></span><br></pre></td></tr></table></figure>
-<p>应读取原始描述符本身，并通过 URB/request 的合法 CPU 映射获取
-payload；对 SG、非线性 buffer 和 HCD 已建立的 DMA
-mapping，要遵守其所有权和缓存一致性规则。</p>
-<h2 id="字节序越界与硬件并发">9.2 字节序、越界与硬件并发</h2>
-<ul>
-<li>TRB 字段使用 little-endian，应通过 <code>le32_to_cpu()</code>
-解析。</li>
-<li>每个 TRB 固定 16 字节，用户配置的 <code>dump_size</code>
-必须限幅，否则顺序 dump 会越过当前 TRB。</li>
-<li>硬件可能同时修改
-ring，调试读取要理解一致性；必要时暂停相应流量或在锁保护下拍快照。</li>
-<li>高频路径逐个 TRB <code>pr_info()</code>
-既可能刷屏，也会改变传输时序，debugfs 按需读取更合适。</li>
-</ul>
-<h2 id="hook-的生命周期和并发缺陷">9.3 hook 的生命周期和并发缺陷</h2>
-<p>原示例只注册 hook，没有在模块退出时注销；若模块卸载后 debugfs
-仍调用函数指针，会跳转到已释放代码。仅在注册时加 mutex 也不能解决 show
-与 unregister 并发。</p>
-<p>更稳妥的选择依次是：</p>
-<ol type="1">
-<li>直接将调试功能构建进所属驱动，随端点目录创建/销毁；</li>
-<li>使用内核已有 tracepoint 或正式导出的只读接口；</li>
-<li>若必须 hook，增加 unregister、模块引用和
-SRCU/读写锁等完整生命周期设计。</li>
-</ol>
-<h2 id="debugfs-接口细节">9.4 debugfs 接口细节</h2>
-<ul>
-<li>创建为 <code>0444</code> 却实现
-<code>.write</code>，权限与行为不一致；若确需配置，应明确使用写权限并校验输入。</li>
-<li><code>single_open()</code> 的 private data 应与
-<code>debugfs_create_file(..., dep, ...)</code> 对齐，通常从
-<code>inode-&gt;i_private</code> 传入，而不是无条件传
-<code>NULL</code>。</li>
-<li>通过 <code>dep-&gt;name[2] - '0'</code>
-解析端点只能支持个位数字，应使用严格字符串转换。</li>
-<li>配置解析既要支持数字，也要明确定义 <code>normal/link</code>
-等名称到位值的映射，不能悄悄得到全不匹配的空结果。</li>
-</ul>
-<p>这些问题说明：调试代码也运行在内核中，不能因为“只用于调试”就忽略内存安全、并发和模块生命周期。</p>
-<h2 id="编写多域共享的udc">9.5 编写多域共享的UDC</h2>
-<p>基本思路：板端linux侧运行有adbd + gadget +
-dummy_hcd，r5核操作物理USB与主机adb通信，dummy_hcd与r5核通过核间通信+共享内存传递usb消息和数据</p>
-<p>实现参考：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">#include &lt;linux/module.h&gt;</span><br><span class="line">#include &lt;linux/kernel.h&gt;</span><br><span class="line">#include &lt;linux/platform_device.h&gt;</span><br><span class="line">#include &lt;linux/usb/gadget.h&gt;</span><br><span class="line">#include &lt;linux/slab.h&gt;</span><br><span class="line">#include &lt;linux/io.h&gt;</span><br><span class="line"></span><br><span class="line">#define DRIVER_NAME &quot;r5_virtual_udc&quot;</span><br><span class="line">#define VIRTUAL_EP_NUM 4  // 假设支持 4 个虚拟端点 (EP0, EP1_IN, EP1_OUT, etc.)</span><br><span class="line"></span><br><span class="line">/* 自定义设备结构体 */</span><br><span class="line">struct r5_virt_udc &#123;</span><br><span class="line">    struct usb_gadget gadget;</span><br><span class="line">    struct usb_ep ep[VIRTUAL_EP_NUM];</span><br><span class="line">    struct spinlock lock;</span><br><span class="line">    struct device *dev;</span><br><span class="line">    bool driver_bound;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line">/* 模拟与 R5 核的 IPC 发送函数（底层通常是 RPMsg / Mailbox） */</span><br><span class="line">static int r5_ipc_send_message(uint32_t cmd, void *data, size_t len) &#123;</span><br><span class="line">    // TODO: 实现具体的核间通信发送逻辑</span><br><span class="line">    // 将命令和共享内存地址/偏移通知 R5</span><br><span class="line">    return 0;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">/* =========================================================================</span><br><span class="line"> * 1. Endpoint 操作实现 (usb_ep_ops)</span><br><span class="line"> * ========================================================================= */</span><br><span class="line"></span><br><span class="line">static int r5_ep_enable(struct usb_ep *_ep, const struct usb_endpoint_descriptor *desc)</span><br><span class="line">&#123;</span><br><span class="line">    struct r5_virt_udc *udc = container_of(_ep-&gt;gadget, struct r5_virt_udc, gadget);</span><br><span class="line">    </span><br><span class="line">    dev_info(udc-&gt;dev, &quot;Enable endpoint: %s, maxpacket: %d\n&quot;, </span><br><span class="line">             _ep-&gt;name, usb_endpoint_maxp(desc));</span><br><span class="line"></span><br><span class="line">    // 通过 IPC 告知 R5：某端点已启用，需配置底层物理控制器对应的寄存器</span><br><span class="line">    r5_ipc_send_message(CMD_EP_ENABLE, (void *)desc, sizeof(*desc));</span><br><span class="line"></span><br><span class="line">    return 0;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">static int r5_ep_disable(struct usb_ep *_ep)</span><br><span class="line">&#123;</span><br><span class="line">    struct r5_virt_udc *udc = container_of(_ep-&gt;gadget, struct r5_virt_udc, gadget);</span><br><span class="line">    </span><br><span class="line">    dev_info(udc-&gt;dev, &quot;Disable endpoint: %s\n&quot;, _ep-&gt;name);</span><br><span class="line">    </span><br><span class="line">    // 通知 R5 禁用对应端点</span><br><span class="line">    r5_ipc_send_message(CMD_EP_DISABLE, (void *)_ep-&gt;name, strlen(_ep-&gt;name));</span><br><span class="line"></span><br><span class="line">    return 0;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">static struct usb_request *r5_ep_alloc_request(struct usb_ep *_ep, gfp_t gfp_flags)</span><br><span class="line">&#123;</span><br><span class="line">    struct usb_request *req;</span><br><span class="line">    </span><br><span class="line">    req = kzalloc(sizeof(*req), gfp_flags);</span><br><span class="line">    if (!req)</span><br><span class="line">        return NULL;</span><br><span class="line"></span><br><span class="line">    // 这里可以为请求分配共享内存区域（Zero-copy 优化点）</span><br><span class="line">    return req;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">static void r5_ep_free_request(struct usb_ep *_ep, struct usb_request *_req)</span><br><span class="line">&#123;</span><br><span class="line">    kfree(_req);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">/* 核心：数据发送/接收队列提交 */</span><br><span class="line">static int r5_ep_queue(struct usb_ep *_ep, struct usb_request *_req, gfp_t gfp_flags)</span><br><span class="line">&#123;</span><br><span class="line">    struct r5_virt_udc *udc = container_of(_ep-&gt;gadget, struct r5_virt_udc, gadget);</span><br><span class="line">    </span><br><span class="line">    unsigned long flags;</span><br><span class="line">    spin_lock_irqsave(&amp;udc-&gt;lock, flags);</span><br><span class="line"></span><br><span class="line">    dev_dbg(udc-&gt;dev, &quot;Queue request to ep %s, length: %d\n&quot;, _ep-&gt;name, _req-&gt;length);</span><br><span class="line"></span><br><span class="line">    /* </span><br><span class="line">     * 数据桥接核心逻辑：</span><br><span class="line">     * 1. 如果是 IN 方向（Linux -&gt; Host）：</span><br><span class="line">     *    `_req-&gt;buf` 中的数据已经准备好。如果是共享内存架构，</span><br><span class="line">     *    只需将 `_req-&gt;buf` 的物理地址/偏移和长度通过 IPC 发给 R5。</span><br><span class="line">     * 2. 如果是 OUT 方向（Host -&gt; Linux）：</span><br><span class="line">     *    通知 R5 准备接收数据到指定的共享内存缓冲区。</span><br><span class="line">     */</span><br><span class="line">    r5_ipc_send_message(CMD_DATA_SUBMIT, _req, sizeof(*_req));</span><br><span class="line"></span><br><span class="line">    spin_unlock_irqrestore(&amp;udc-&gt;lock, flags);</span><br><span class="line">    return 0;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">static int r5_ep_dequeue(struct usb_ep *_ep, struct usb_request *_req)</span><br><span class="line">&#123;</span><br><span class="line">    // 取消传输队列中的请求</span><br><span class="line">    return 0;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">static const struct usb_ep_ops r5_ep_ops = &#123;</span><br><span class="line">    .enable         = r5_ep_enable,</span><br><span class="line">    .disable        = r5_ep_disable,</span><br><span class="line">    .alloc_request  = r5_ep_alloc_request,</span><br><span class="line">    .free_request   = r5_ep_free_request,</span><br><span class="line">    .queue          = r5_ep_queue,</span><br><span class="line">    .dequeue        = r5_ep_dequeue,</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line">/* =========================================================================</span><br><span class="line"> * 2. Gadget 控制器操作实现 (usb_gadget_ops)</span><br><span class="line"> * ========================================================================= */</span><br><span class="line"></span><br><span class="line">static int r5_udc_start(struct usb_gadget *gadget, struct usb_gadget_driver *driver)</span><br><span class="line">&#123;</span><br><span class="line">    struct r5_virt_udc *udc = container_of(gadget, struct r5_virt_udc, gadget);</span><br><span class="line"></span><br><span class="line">    dev_info(udc-&gt;dev, &quot;UDC start, binding gadget driver: %s\n&quot;, driver-&gt;function);</span><br><span class="line">    udc-&gt;driver_bound = true;</span><br><span class="line"></span><br><span class="line">    // 通知 R5 物理控制器可以开始连接（拉高或使能 VBUS/Pull-up）</span><br><span class="line">    r5_ipc_send_message(CMD_UDC_START, NULL, 0);</span><br><span class="line"></span><br><span class="line">    return 0;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">static int r5_udc_stop(struct usb_gadget *gadget)</span><br><span class="line">&#123;</span><br><span class="line">    struct r5_virt_udc *udc = container_of(gadget, struct r5_virt_udc, gadget);</span><br><span class="line"></span><br><span class="line">    dev_info(udc-&gt;dev, &quot;UDC stop\n&quot;);</span><br><span class="line">    udc-&gt;driver_bound = false;</span><br><span class="line"></span><br><span class="line">    // 通知 R5 停止 USB 会话</span><br><span class="line">    r5_ipc_send_message(CMD_UDC_STOP, NULL, 0);</span><br><span class="line"></span><br><span class="line">    return 0;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">static const struct usb_gadget_ops r5_udc_ops = &#123;</span><br><span class="line">    .udc_start      = r5_udc_start,</span><br><span class="line">    .udc_stop       = r5_udc_stop,</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line">/* =========================================================================</span><br><span class="line"> * 3. 接收来自 R5 的异步通知 (中断/IPC回调)</span><br><span class="line"> * ========================================================================= */</span><br><span class="line"></span><br><span class="line">// 当 R5 收到物理 USB 中断（如收到数据、USB复位、断开连接等）时，通过 IPC 触发此回调</span><br><span class="line">void r5_to_linux_ipc_callback(uint32_t event_type, void *payload, size_t len)</span><br><span class="line">&#123;</span><br><span class="line">    struct r5_virt_udc *udc = /* 获取全局 udc 实例 */;</span><br><span class="line"></span><br><span class="line">    switch (event_type) &#123;</span><br><span class="line">    case EVENT_USB_RESET:</span><br><span class="line">        // 模拟 USB 总线复位</span><br><span class="line">        usb_gadget_set_state(&amp;udc-&gt;gadget, USB_STATE_DEFAULT);</span><br><span class="line">        break;</span><br><span class="line">        </span><br><span class="line">    case EVENT_DATA_RECEIVED:</span><br><span class="line">        // R5 收到 Host 的 OUT 数据并写入共享内存后</span><br><span class="line">        // 1. 将数据从共享内存复制或映射给对应的 usb_request</span><br><span class="line">        // 2. 调用 gadget 层的 complete 回调，向上交付给 adbd</span><br><span class="line">        // 示例：req-&gt;complete(ep, req);</span><br><span class="line">        break;</span><br><span class="line"></span><br><span class="line">    case EVENT_TRANSFER_COMPLETE:</span><br><span class="line">        // 对应 IN 传输完成，通知上层释放/复用请求</span><br><span class="line">        break;</span><br><span class="line">        </span><br><span class="line">    default:</span><br><span class="line">        break;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">/* =========================================================================</span><br><span class="line"> * 4. Driver Init / Exit</span><br><span class="line"> * ========================================================================= */</span><br><span class="line"></span><br><span class="line">static int __init r5_virt_udc_probe(struct platform_device *pdev)</span><br><span class="line">&#123;</span><br><span class="line">    struct r5_virt_udc *udc;</span><br><span class="line">    int ret, i;</span><br><span class="line"></span><br><span class="line">    udc = devm_kzalloc(&amp;pdev-&gt;dev, sizeof(*udc), GFP_KERNEL);</span><br><span class="line">    if (!udc)</span><br><span class="line">        return -ENOMEM;</span><br><span class="line"></span><br><span class="line">    udc-&gt;dev = &amp;pdev-&gt;dev;</span><br><span class="line">    spin_lock_init(&amp;udc-&gt;lock);</span><br><span class="line"></span><br><span class="line">    // 初始化 gadget 基本属性</span><br><span class="line">    udc-&gt;gadget.ops = &amp;r5_udc_ops;</span><br><span class="line">    udc-&gt;gadget.max_speed = USB_SPEED_HIGH; // 或 USB_SPEED_SUPER</span><br><span class="line">    udc-&gt;gadget.speed = USB_SPEED_UNKNOWN;</span><br><span class="line">    udc-&gt;gadget.name = DRIVER_NAME;</span><br><span class="line"></span><br><span class="line">    // 初始化虚拟端点</span><br><span class="line">    INIT_LIST_HEAD(&amp;udc-&gt;gadget.ep_list);</span><br><span class="line">    for (i = 0; i &lt; VIRTUAL_EP_NUM; i++) &#123;</span><br><span class="line">        struct usb_ep *ep = &amp;udc-&gt;ep[i];</span><br><span class="line">        if (i == 0) &#123;</span><br><span class="line">            ep-&gt;name = &quot;ep0&quot;;</span><br><span class="line">            ep-&gt;ops = &amp;r5_ep_ops;</span><br><span class="line">            usb_ep_set_maxpacket_limit(ep, 64);</span><br><span class="line">            udc-&gt;gadget.ep0 = ep;</span><br><span class="line">        &#125; else &#123;</span><br><span class="line">            // 示例：批量端点</span><br><span class="line">            ep-&gt;name = (i % 2 == 1) ? &quot;ep1in&quot; : &quot;ep1out&quot;;</span><br><span class="line">            ep-&gt;ops = &amp;r5_ep_ops;</span><br><span class="line">            usb_ep_set_maxpacket_limit(ep, 512);</span><br><span class="line">            list_add_tail(&amp;ep-&gt;ep_list, &amp;udc-&gt;gadget.ep_list);</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 向 Linux Kernel 注册 UDC 设备</span><br><span class="line">    ret = usb_add_gadget_udc(&amp;pdev-&gt;dev, &amp;udc-&gt;gadget);</span><br><span class="line">    if (ret)</span><br><span class="line">        return ret;</span><br><span class="line"></span><br><span class="line">    platform_set_drvdata(pdev, udc);</span><br><span class="line">    dev_info(&amp;pdev-&gt;dev, &quot;R5 Virtual UDC initialized successfully.\n&quot;);</span><br><span class="line">    return 0;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">static int r5_virt_udc_remove(struct platform_device *pdev)</span><br><span class="line">&#123;</span><br><span class="line">    struct r5_virt_udc *udc = platform_get_drvdata(pdev);</span><br><span class="line"></span><br><span class="line">    usb_del_gadget_udc(&amp;udc-&gt;gadget);</span><br><span class="line">    return 0;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">static struct platform_driver r5_virt_udc_driver = &#123;</span><br><span class="line">    .probe    = r5_virt_udc_probe,</span><br><span class="line">    .remove   = r5_virt_udc_remove,</span><br><span class="line">    .driver   = &#123;</span><br><span class="line">        .name = DRIVER_NAME,</span><br><span class="line">    &#125;,</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line">module_platform_driver(r5_virt_udc_driver);</span><br><span class="line"></span><br><span class="line">MODULE_LICENSE(&quot;GPL&quot;);</span><br><span class="line">MODULE_DESCRIPTION(&quot;Virtual UDC Bridge for R5-Linux Heterogeneous Architecture&quot;);</span><br></pre></td></tr></table></figure>
-<hr>
-<h1 id="性能验证与压力测试">10. 性能验证与压力测试</h1>
-<h2 id="存储吞吐">10.1 存储吞吐</h2>
-<p>原始记录使用绕过页缓存的 <code>dd</code> 做基本读写测试：</p>
-<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line"><span class="built_in">dd</span> <span class="keyword">if</span>=/dev/zero of=/mnt/usb/test.bin bs=1M count=1024 oflag=direct status=progress</span><br><span class="line"><span class="built_in">dd</span> <span class="keyword">if</span>=/mnt/usb/test.bin of=/dev/null bs=1M iflag=direct status=progress</span><br></pre></td></tr></table></figure>
-<p>它能做基本比较，但不是完整性能结论。正式测试还应控制：</p>
-<ul>
-<li>文件系统、分区对齐和挂载参数；</li>
-<li>块大小、队列深度、顺序/随机模式；</li>
-<li>direct I/O 与缓存影响；</li>
-<li>设备自身缓存和介质状态；</li>
-<li>UAS/BOT、协商速率和 CPU/softirq 占用；</li>
-<li>多次重复、预热、均值和长尾延迟。</li>
-</ul>
-<h2 id="虚拟-adb-通道必须覆盖的用例">10.2 虚拟 ADB
-通道必须覆盖的用例</h2>
-<ul>
-<li>小文件与大文件，特别是跨聚合阈值、跨跨核消息边界的场景。</li>
-<li>payload 为端点最大包长整数倍、整数倍加减 1 的 ZLP 边界。</li>
-<li>连续 <code>WRTE</code>、短包、最后一包数据与
-<code>DONE</code>/<code>CLSE</code> 紧挨的场景。</li>
-<li>ADB 与 TTY 并发，验证控制消息不被大数据长期阻塞。</li>
-<li>高吞吐下的队列深度、内存占用、跨核消息速率和端到端尾延迟。</li>
-<li>传输中物理拔出、对端复位、Linux 域重启和实时安全域异常。</li>
-<li>反复 suspend/resume、role switch、Gadget 重配置。</li>
-<li>故障注入：跨核消息丢失、ACK 延迟、credit 耗尽、timer 与 disconnect
-竞争。</li>
-</ul>
-<p>评价不能只看“文件最后是否传完”，还应比较吞吐、平均/尾延迟、CPU
-占用、队列峰值和异常后的恢复时间。</p>
-<hr>
-<h1 id="面试高频追问与回答要点">11. 面试高频追问与回答要点</h1>
-<h2 id="q1usb-设备驱动为什么通常绑定-interface而不是-usb_device">Q1：USB
-设备驱动为什么通常绑定 Interface，而不是 <code>usb_device</code>？</h2>
-<p>一个物理设备可有多个配置和多个 Interface，每个 Interface
-承担独立功能，例如存储、ADB、串口或音频。usbcore 先由 generic driver
-选择并设置配置，再注册各
-Interface，由类驱动匹配和绑定。因此一个复合设备能同时被多个驱动管理。</p>
-<h2 id="q2为什么热插拔枚举放到工作队列而不是在-xhci-irq-里做">Q2：为什么热插拔枚举放到工作队列，而不是在
-xHCI IRQ 里做？</h2>
-<p>IRQ 中只适合读取事件、更新 Ring
-和安排后续处理。枚举包含去抖延时、控制传输、内存分配、设备注册和驱动
-probe，可能睡眠且耗时，必须在可睡眠上下文完成。</p>
-<h2 id="q3urb-返回-status-0-是否说明业务成功">Q3：URB 返回
-<code>status = 0</code> 是否说明业务成功？</h2>
-<p>不是。还要检查
-<code>actual_length</code>、短包语义以及上层协议状态。例如 UAS
-传输成功只代表 USB 数据阶段完成，SCSI 命令是否成功还要看
-Status/Sense；ADB 也要检查响应命令和连接状态。</p>
-<h2 id="q4什么时候需要-zlp">Q4：什么时候需要 ZLP？</h2>
-<p>当传输长度是端点最大包长整数倍，且协议要求用短包标识结束时，末尾需要
-ZLP。它由 USB 传输语义和 request zero
-标志决定，不是固定的周期性保活包。</p>
-<h2 id="q5uas-为什么通常比-bot-更适合高速存储">Q5：UAS 为什么通常比 BOT
-更适合高速存储？</h2>
-<p>UAS 将命令、状态和数据分离，支持多命令并发，并可在 USB 3.x 中使用
-Streams 映射队列；BOT 的 CBW/Data/CSW 模型更串行。两者最终都接入 SCSI
-Core，所以上层块设备模型一致。</p>
-<h2 id="q6为什么一个-xhci-控制器会看到两条-usb-总线">Q6：为什么一个 xHCI
-控制器会看到两条 USB 总线？</h2>
-<p>xHCI 同时管理不同速率体系，Linux 通常分别建立 USB 2 与 USB 3 root
-hub。日志中的 bus 1/bus 2 不代表有两个独立物理 xHCI 控制器。</p>
-<h2 id="q7dummy-hcdudc-在虚拟-usb-中解决了什么">Q7：dummy HCD/UDC 在虚拟
-USB 中解决了什么？</h2>
-<p>它在 Linux 内提供标准 Host—Gadget 软件回环，使现有 Gadget Function 和
-USB Host
-驱动可以复用，无需直接访问对端物理控制器。但它只解决软件接口仿真，跨域可靠性、物理链路状态和协议边界仍需额外设计。</p>
-<h2 id="q8聚合发送为什么既能提速又会导致卡顿">Q8：聚合发送为什么既能提速又会导致卡顿？</h2>
-<p>聚合减少跨核消息和调度开销，提高吞吐；但若发送方一直等待达到聚合阈值，最后一个逻辑消息可能迟迟不能发出。解决方法是边界事件立即
-flush，并以字节阈值、时间阈值和队列上限做有界聚合。</p>
-<h2 id="q9安全弹出后为什么端口仍可能供电">Q9：安全弹出后为什么端口仍可能供电？</h2>
-<p>安全弹出主要是停止 I/O、刷新缓存并逻辑断开设备，不要求物理切断
-VBUS。供电状态与设备可用状态是两个维度。</p>
-<h2 id="q10disconnect-时最容易出现哪些并发问题">Q10：disconnect
-时最容易出现哪些并发问题？</h2>
-<p>回调重提交 URB、timer 在释放后触发、RX/TX
-线程等待条件未唤醒、字符设备仍持有上下文、跨域迟到消息访问已注销通道。正确顺序是先阻止新工作，再取消异步任务，等待旧工作退出，最后释放对象。</p>
-<h2 id="q11能不能直接读取-trb-中的数据地址">Q11：能不能直接读取 TRB
-中的数据地址？</h2>
-<p>不能把其中的 DMA 地址直接当 CPU 虚拟地址。必须找到对应的 CPU buffer
-或合法映射，并考虑 SG、缓存一致性、HCD 所有权和硬件并发。</p>
-<h2 id="q12设备只枚举成-high-speed如何定位">Q12：设备只枚举成 High
-Speed，如何定位？</h2>
-<p>先确认硬件是否支持并允许 SuperSpeed，再检查 Type-C
-方向、lane/MUX、PHY、速率限制和 PORTSC。USB 2 与 SuperSpeed
-使用不同信号路径，所以“能枚举为 HS”并不能证明高速链路正常。</p>
-<h2 id="q13角色切换为什么要停止-gadget-服务">Q13：角色切换为什么要停止
-Gadget 服务？</h2>
-<p>因为旧服务可能继续持有 configfs Function、UDC request
-或字符设备资源。若不停止，角色切换会和配置重建并发，造成绑定失败、资源泄漏或访问已销毁的
-UDC。</p>
-<h2 id="q14如何判断问题在-usbscsi-还是块层">Q14：如何判断问题在
-USB、SCSI 还是块层？</h2>
-<p>用分层证据：usbmon 看控制/Bulk 传输；UAS 日志看命令与状态；SCSI
-日志看 INQUIRY、Sense 和错误恢复；sysfs/块层看
-<code>gendisk</code>、容量与分区。不要仅凭最终没有 <code>/dev/sdX</code>
-就修改 HCD。</p>
-<hr>
-<h1 id="可直接用于面试的三个问题复盘">12.
-可直接用于面试的三个问题复盘</h1>
-<h2 id="高速存储设备枚举为低速">12.1 高速存储设备枚举为低速</h2>
-<p><strong>现象</strong>：同一设备在不同 Type-C 方向或 lane
-配置下，分别表现为 High Speed 与 SuperSpeed Plus。</p>
-<p><strong>定位方法</strong>：对比插入方向、orientation、sysfs speed 和
-PORTSC；确认 USB 2 通路始终可用，而 SuperSpeed 依赖正确的 lane。</p>
-<p><strong>结论</strong>：问题优先指向 Type-C/PHY/lane 配置，而不是 SCSI
-或文件系统。</p>
-<p><strong>体现能力</strong>：能根据 USB 2 与 SuperSpeed
-的物理通路差异缩小范围，并用对照实验验证。</p>
-<h2 id="大文件-adb-传输间歇性卡住">12.2 大文件 ADB 传输间歇性卡住</h2>
-<p><strong>现象</strong>：小文件正常，大文件在持续传输中出现等待；虚拟通道使用聚合发送，临时通过计数/计时
-flush 缓解。</p>
-<p><strong>定位方法</strong>：用 usbmon 配对 URB S/C，观察 ADB
-<code>WRTE/DATA/DONE/CLSE</code> 边界，检查 dummy 聚合队列和 flush
-timer。</p>
-<p><strong>分析</strong>：底层不理解上层消息结束条件，尾包被聚合策略延迟；ZLP
-与消息边界又可能混淆。</p>
-<p><strong>改进</strong>：将边界语义显式传入虚拟通道，结束事件立即发送，保留有界超时聚合，并增加
-credit 反压。</p>
-<p><strong>体现能力</strong>：不仅修一个定时器，而是识别层次边界、吞吐/延迟权衡和跨域流控问题。</p>
-<h2 id="存储设备已枚举但没有块设备">12.3 存储设备已枚举但没有块设备</h2>
-<p><strong>现象</strong>：USB 描述符可读取，但最终未出现目标盘符。</p>
-<p><strong>定位方法</strong>：检查配置与 Interface 绑定、UAS probe、SCSI
-Host、INQUIRY、LUN、READ CAPACITY 和
-<code>sd_probe</code>，逐段确认最后一个成功节点。</p>
-<p><strong>结论方法</strong>：把“生成盘符”拆成多个可观测阶段，不将所有失败都归因于
-USB 控制器。</p>
-<p><strong>体现能力</strong>：具备跨子系统调用链分析能力，能选择正确的日志和抓包位置。</p>
-<hr>
-<h1 id="最终技术清单">13. 最终技术清单</h1>
-<p>面试前应确保自己不仅能说出函数名，还能解释下面每一点：</p>
-<ul class="task-list">
-<li><label><input type="checkbox">Host、Gadget、UDC、HCD、usbcore
-各自处于哪一层。</label></li>
-<li><label><input type="checkbox"><code>usb_device</code> 与
-<code>usb_interface</code> 的注册和 probe 顺序。</label></li>
-<li><label><input type="checkbox">URB 的提交、完成、取消、anchor 与
-buffer 所有权。</label></li>
-<li><label><input type="checkbox">xHCI Command/Transfer/Event
-Ring、TRB、Cycle、Doorbell 的关系。</label></li>
-<li><label><input type="checkbox">从 Port Status Change Event 到
-<code>hub_event</code> 的完整热插拔链路。</label></li>
-<li><label><input type="checkbox">从 UAS probe 到 SCSI
-LUN、<code>sd_probe</code>、块设备的完整链路。</label></li>
-<li><label><input type="checkbox">BOT 与 UAS 的并发模型及 Streams
-的意义。</label></li>
-<li><label><input type="checkbox">PORTSC 的
-connection、enable、power、PLS 和 change 位如何配合判断。</label></li>
-<li><label><input type="checkbox">Host/Device role switch 与 Type-C
-orientation 的状态依赖。</label></li>
-<li><label><input type="checkbox">USB packet、URB/request、ADB
-message、跨域转发块的区别。</label></li>
-<li><label><input type="checkbox">ZLP
-的准确使用条件，以及聚合导致尾延迟的原因。</label></li>
-<li><label><input type="checkbox">runtime PM 引用平衡、root hub wakeup
-与 STR 的区别。</label></li>
-<li><label><input type="checkbox">disconnect 时
-URB、kthread、timer、字符设备和跨域回调的退出顺序。</label></li>
-<li><label><input type="checkbox">dynamic
-debug、tracepoint、usbmon、debugfs、JTAG
-各自适合回答什么问题。</label></li>
-<li><label><input type="checkbox">为什么 DMA 地址不能直接
-<code>readl()</code>，以及调试模块为何也需要生命周期管理。</label></li>
-</ul>
-<p><strong>一句话收尾</strong>：这套 USB 工作的核心价值，在于把
-Host/Device
-两条协议栈、跨域虚拟化和多子系统调试连成了一张完整的问题定位地图；真正体现资深驱动能力的，不是记住某个寄存器或调用链，而是能在协议边界、并发生命周期、电源状态和性能权衡之间作出可验证的设计。</p>
 ]]></content>
       <categories>
         <category>Linux</category>
