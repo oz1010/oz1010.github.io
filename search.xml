@@ -1,559 +1,631 @@
 <?xml version="1.0" encoding="utf-8"?>
 <search>
   <entry>
-    <title>Linux驱动-VeloceStrato仿真与芯片Bring-up前USB驱动调试经验</title>
-    <url>/2026/11/11/Linux%E9%A9%B1%E5%8A%A8-VeloceStrato%E4%BB%BF%E7%9C%9F%E4%B8%8E%E8%8A%AF%E7%89%87Bring-up%E5%89%8DUSB%E9%A9%B1%E5%8A%A8%E8%B0%83%E8%AF%95%E7%BB%8F%E9%AA%8C/</url>
-    <content><![CDATA[<h1 id="项目背景与个人职责">1. 项目背景与个人职责</h1>
-<p>项目需要在芯片回片前验证 USB3
-控制器及其周边总线的功能安全机制。验证对象不只是“USB
-能否枚举”，而是下面这条完整链路：</p>
-<figure class="highlight text"><table><tr><td class="code"><pre><span class="line">安全核启动镜像</span><br><span class="line">    ↓</span><br><span class="line">应用核裸机测试程序 / USB 裸机驱动</span><br><span class="line">    ↓</span><br><span class="line">DWC3 USB 控制器</span><br><span class="line">    ├─ CSR 配置通路：CPU → NoC → AXI/AHB/APB 桥 → USB 寄存器</span><br><span class="line">    └─ DMA 主通路：USB 控制器 → NoC → SRAM / DDR</span><br><span class="line">    ↓</span><br><span class="line">Parity 注错 → 错误状态 → 中断 Mask → 安全中断 → 中断清除</span><br></pre></td></tr></table></figure>
-<p>我的主要工作包括：</p>
-<ul>
-<li>搭建并维护 Strato
-硬件仿真环境，匹配仿真版本、启动镜像、加载脚本和硬件资源。</li>
-<li>调试 USB Host/Device 两种模式下的裸机驱动及测试程序，配合 QEMU Linux
-主机完成设备连接。</li>
-<li>梳理 USB 控制器的 CSR 配置通路和 DMA 主通路，将 Parity
-条目转化为可执行用例。</li>
-<li>定位 MMIO 访问异常、软复位/Event Buffer
-配置卡住、用例顺序依赖、Buffer 路径未切换等问题。</li>
-<li>使用 Trigger
-和波形把软件日志与总线事务、注错信号、中断状态关联起来。</li>
-<li>将仿真用例迁移到样片，修复平台配置差异，最终完成重构后 <strong>20/20
-条功能安全用例全量通过</strong>。</li>
-</ul>
-<p>这段经历的核心价值是：<strong>在缺少真实芯片、问题跨软硬件边界时，建立可重复、可观测、可二分定位的调试闭环。</strong></p>
-<h1 id="为什么-bring-up-前不能只做枚举测试">2. 为什么 Bring-up
-前不能只做“枚举测试”</h1>
-<p>USB 枚举成功只能证明一条 happy path 基本可用，无法回答以下问题：</p>
-<ol type="1">
-<li>CPU 对 USB
-寄存器的读、写、地址、返回数据是否分别经过预期的校验逻辑？</li>
-<li>USB 控制器作为 Bus Master 发起 DMA
-时，<code>ARADDR/AWADDR/WDATA/RDATA</code> 是否覆盖目标 NoC 通路？</li>
-<li>Parity
-错误被注入后，错误是否真正发生在目标事务上，而不是只改变了一个注错寄存器？</li>
-<li>中断被 Mask 后，状态位和中断输出分别应该是什么表现？</li>
-<li>单条用例通过，是否依赖前一条用例残留的 probe、Mask、Buffer
-或控制器状态？</li>
-<li>仿真环境通过，样片配置是否仍然选择了同一条 Buffer 和总线路径？</li>
-</ol>
-<p>因此，我把验证目标定义为四个“闭环”：</p>
-<ul>
-<li><strong>激励闭环</strong>：寄存器访问或 DMA
-事务确实到达目标通路。</li>
-<li><strong>错误闭环</strong>：注错确实作用于目标事务，并被校验逻辑检测。</li>
-<li><strong>上报闭环</strong>：状态位、Mask、中断号、中断处理函数均符合预期。</li>
-<li><strong>恢复闭环</strong>：清状态、清中断、恢复配置后，下一条用例不受污染。</li>
-</ul>
-<h1 id="strato-仿真环境的工程化使用">3. Strato 仿真环境的工程化使用</h1>
-<h2 id="环境组成">3.1 环境组成</h2>
-<p>实际调试环境由五部分组成：</p>
+    <title>Linux驱动-VeloceStrato仿真USB驱动指南</title>
+    <url>/2026/11/11/Linux%E9%A9%B1%E5%8A%A8-VeloceStrato%E4%BB%BF%E7%9C%9FUSB%E9%A9%B1%E5%8A%A8%E6%8C%87%E5%8D%97/</url>
+    <content><![CDATA[<h1 id="适用范围与验证架构">适用范围与验证架构</h1>
+<p>本文基于 USB Host/Device 仿真测试记录整理，面向 Linux USB
+驱动、裸机软件及 SoC 验证工程师，覆盖 Veloce Strato 工程组织、启动、USB
+裸驱测试、功能安全注错和波形调试。</p>
+<p><strong>适用边界</strong>：工程命令来自原始测试环境，不是所有 Veloce
+版本的通用接口；Linux 观测及 DMA
+原则由公开资料补充。内部组织、芯片型号、人员、账号、服务器、仓库、绝对地址及
+RTL 层级已泛化，不保留原始截图。文中 <code>&lt;…&gt;</code>
+均为待替换项；建议目录或伪代码不代表已交付文件。</p>
+<h2 id="系统组成">系统组成</h2>
 <table>
 <colgroup>
-<col style="width: 19%">
-<col style="width: 39%">
-<col style="width: 41%">
+<col style="width: 25%">
+<col style="width: 42%">
+<col style="width: 31%">
 </colgroup>
 <thead>
 <tr class="header">
-<th>组成部分</th>
-<th>作用</th>
-<th>主要风险</th>
+<th>层次</th>
+<th>主要职责</th>
+<th>排查重点</th>
 </tr>
 </thead>
 <tbody>
 <tr class="odd">
-<td>Strato 仿真工程</td>
-<td>运行 SoC RTL，提供硬件事务和波形</td>
-<td>版本、资源划分、DUT 模式不匹配</td>
+<td>Strato 硬件模型</td>
+<td>执行 DUT RTL，提供时钟、复位、存储器及互连模型</td>
+<td>设计标签、资源布局、信号可见性</td>
 </tr>
 <tr class="even">
-<td>安全核镜像</td>
-<td>完成启动、时钟/复位及系统配置</td>
-<td>ROM/SRAM 启动方式和版本不一致</td>
+<td>Linux 仿真服务器与 <code>velrun</code></td>
+<td>加载模型、运行 Tcl、控制时钟、采集 trace</td>
+<td>工具版本、环境变量、会话和资源状态</td>
 </tr>
 <tr class="odd">
-<td>应用核镜像</td>
-<td>执行裸机 USB 驱动和测试命令</td>
-<td>链接地址、加载地址、释放地址不一致</td>
+<td>VirtuaLAB / USB 协同模型</td>
+<td>连接 DUT 与虚拟 USB 对端，提供协议观测</td>
+<td>角色、端口、连接时序、模型版本</td>
 </tr>
 <tr class="even">
-<td>QEMU Linux</td>
-<td>DUT 作为 Device 时提供 USB Host</td>
-<td>虚拟 USB 设备、连接时序不匹配</td>
+<td>QEMU / 虚拟机</td>
+<td>在设备模式验证中运行外部 Host 软件栈</td>
+<td>Guest 镜像、协同主机、设备枚举</td>
 </tr>
 <tr class="odd">
-<td>Trigger/Waveform</td>
-<td>观察 RTL 事务和注错过程</td>
-<td>信号类型、层级、采样深度不正确</td>
+<td>安全核固件</td>
+<td>完成早期初始化并释放应用核</td>
+<td>ROM/RAM 镜像、链接与加载地址</td>
+</tr>
+<tr class="even">
+<td>应用核裸驱</td>
+<td>初始化 USB、构造事务、执行注错并检查中断</td>
+<td>MMIO 宽度、DMA、用例前后状态</td>
 </tr>
 </tbody>
 </table>
-<p>我坚持将“RTL
-版本、启动镜像、应用核镜像、加载脚本、测试代码”作为一个整体配置管理。只替换其中一个组件后，如果启动失败，不能直接归因于
-USB 驱动。</p>
-<h2 id="shadow-工程与可重复启动">3.2 Shadow 工程与可重复启动</h2>
-<p>使用 Shadow
-工程的目的，是在共享版本之上建立个人可修改副本，避免直接污染基线。通用流程抽象如下：</p>
-<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line"> 在基线工程中建立个人 Shadow</span><br><span class="line"><span class="built_in">cd</span> &lt;project-emulation-build&gt;/comp</span><br><span class="line"><span class="built_in">source</span> SourceMe</span><br><span class="line">make shadow shadow_name=<span class="variable">$&#123;USER&#125;</span></span><br><span class="line"></span><br><span class="line"> 在个人 Shadow 中启动</span><br><span class="line"><span class="built_in">cd</span> &lt;personal-shadow&gt;/comp</span><br><span class="line"><span class="built_in">source</span> SourceMe</span><br><span class="line">make run avb=&lt;allocated-resources&gt;</span><br><span class="line"></span><br><span class="line"> 在仿真命令窗口加载镜像、时钟和复位脚本</span><br><span class="line"><span class="keyword">do</span> run.tcl</span><br></pre></td></tr></table></figure>
-<p>实践中需要特别注意：</p>
-<ul>
-<li><code>SourceMe</code>
-不是可选步骤。未正确加载工程环境时，可能出现信号找不到、工具版本不一致等伪问题。</li>
-<li>USB
-设计对资源块数量和物理划分有约束，不是简单增加资源就能启动。</li>
-<li>资源划分改变后，曾出现同一用例表现不同的情况。因此排查时必须记录资源组合，不能把“换一台机器/换一组资源”作为无效信息。</li>
-<li><code>reinit</code>
-可在不重建整个仿真会话的情况下重置时间和环境，适合反复执行加载脚本。</li>
-<li>完整用例运行较慢时，优先保留单条入口和参考用例，避免每次问题复现都跑全量。</li>
-</ul>
-<h2 id="启动镜像链接加载释放三者必须一致">3.3
-启动镜像：链接、加载、释放三者必须一致</h2>
-<p>项目中涉及安全核 ROM/SRAM 启动和应用核 DDR/SRAM
-启动。这里最容易出现三类不一致：</p>
-<ol type="1">
-<li><strong>链接地址不一致</strong>：代码按 DDR 地址重定位，却链接到
-SRAM 区域。</li>
-<li><strong>加载地址不一致</strong>：加载脚本没有将镜像放到链接脚本假定的位置。</li>
-<li><strong>释放地址不一致</strong>：启动命令释放应用核时，入口并不是实际镜像入口。</li>
-</ol>
-<p>因此我没有把“串口无输出”直接等同于驱动卡死，而是按以下顺序检查：</p>
-<figure class="highlight text"><table><tr><td class="code"><pre><span class="line">镜像文件是否生成</span><br><span class="line">→ 文件是否被 run.tcl 实际加载</span><br><span class="line">→ 加载地址是否等于链接/重定位地址</span><br><span class="line">→ 安全核是否运行到释放应用核</span><br><span class="line">→ 应用核入口是否正确</span><br><span class="line">→ UART 本身是否可用</span><br><span class="line">→ 再进入 USB 驱动问题定位</span><br></pre></td></tr></table></figure>
-<p>对于“替换他人镜像后能启动、自己编译后不能启动”的情况，优先比较配置和镜像，而不是立即修改业务代码。这一步能显著缩小问题范围。</p>
-<h2 id="hostdevice-模式与-qemu-协同">3.4 Host/Device 模式与 QEMU
-协同</h2>
-<p>DUT 作为 Device 时，需要 QEMU 中的 Linux xHCI Host
-参与连接。调试顺序是：</p>
-<ol type="1">
-<li>启动与 DUT Device 模式匹配的 Strato 工程。</li>
-<li>运行应用核 Device 驱动，等待其进入可连接阶段。</li>
-<li>启动带虚拟 USB 设备的 QEMU Linux。</li>
-<li>在仿真侧执行端口连接命令。</li>
-<li>在 Linux Guest 中观察 xHCI 日志和设备枚举情况。</li>
-<li>再执行需要真实 DMA 活动的 Parity 用例。</li>
-</ol>
-<p>Linux Guest 中可打开 xHCI 动态调试：</p>
-<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">mount -t debugfs none /sys/kernel/debug 2&gt;/dev/null || <span class="literal">true</span></span><br><span class="line"><span class="built_in">echo</span> <span class="string">&#x27;module xhci_hcd +p&#x27;</span> &gt; /sys/kernel/debug/dynamic_debug/control</span><br></pre></td></tr></table></figure>
-<p>这里得到的一个重要教训是：<strong>Host 模式下出现的软复位或 Event
-Buffer 配置异常，不能脱离当前仿真集成模式判断。</strong>
-原记录中相关问题在切换到正确的 Device
-版本后不再出现，因此最终结论是“版本与测试方式不匹配”，而不是草率认定为控制器
-RTL Bug。</p>
-<h2 id="用-checkpoint-降低长启动成本">3.5 用 Checkpoint
-降低长启动成本</h2>
-<p>仿真启动和 Linux 启动都可能耗时较长。对已经到达的稳定状态保存
-Checkpoint，可以把调试集中在问题区间：</p>
-<figure class="highlight text"><table><tr><td class="code"><pre><span class="line">stop</span><br><span class="line">checkpoint save -name snapshot.stw</span><br><span class="line"></span><br><span class="line"> 后续恢复：先执行与保存时一致的初始化脚本，再恢复状态</span><br><span class="line">do run.tcl</span><br><span class="line">stop</span><br><span class="line">checkpoint restore -name snapshot.stw</span><br><span class="line">run</span><br></pre></td></tr></table></figure>
-<p>关键不是命令本身，而是保证保存和恢复时使用相同的工程、脚本和镜像上下文，否则恢复出来的状态没有可比性。</p>
-<h1 id="trigger-与波形从看日志升级到看事务">4. Trigger
-与波形：从“看日志”升级到“看事务”</h1>
-<h2 id="软件标记与硬件事件双触发">4.1 软件标记与硬件事件双触发</h2>
-<p>我使用两类 Trigger：</p>
-<ul>
-<li><strong>软件标记触发</strong>：测试代码在关键阶段写预留 CSR，从 0
-变为 1 时触发。适合快速对齐软件阶段。</li>
-<li><strong>硬件事务触发</strong>：以“目标地址出现 +
-注错信号有效”等组合条件触发。适合确认错误是否落在目标总线事务上。</li>
-</ul>
-<p>软件标记的示意代码：</p>
-<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="comment">/* 使用平台预留的调试寄存器，不代表真实地址 */</span></span><br><span class="line">writel(<span class="number">0</span>, USB_DEBUG_TRIGGER_REG);</span><br><span class="line"><span class="comment">/* 执行待观察操作 */</span></span><br><span class="line">writel(<span class="number">1</span>, USB_DEBUG_TRIGGER_REG);</span><br></pre></td></tr></table></figure>
-<p>硬件事务触发更能回答关键问题：注错已经置位，是否真的有一笔目标地址读写经过？如果只有注错信号，没有目标事务，那么“没有中断”并不说明
-Parity 检测失效。</p>
-<h2 id="通用抓取流程">4.2 通用抓取流程</h2>
-<figure class="highlight tcl"><table><tr><td class="code"><pre><span class="line">run -stop</span><br><span class="line">hwtrace on</span><br><span class="line">hwtrace setdepth <span class="number">320000</span></span><br><span class="line">trigger download condition.trigger -position <span class="number">20</span></span><br><span class="line">run</span><br><span class="line">waitfor trigger</span><br><span class="line"></span><br><span class="line">upload -noreplay -tracedir &lt;case-name&gt;.stw -siglist sig.<span class="keyword">list</span></span><br></pre></td></tr></table></figure>
-<p><code>-position 20</code> 表示保留约 20%
-的触发前数据，便于同时观察“触发前的准备”和“触发后的响应”。采样深度必须落在工具支持范围内；原环境中有效范围约为
-32～320968，深度越界会导致脚本异常或不弹出预期界面。</p>
-<p>触发条件采用状态机，避免把持续为真的普通电平误当成一次性事件：</p>
-<figure class="highlight text"><table><tr><td class="code"><pre><span class="line">S0：等待目标地址处于非目标值</span><br><span class="line">S1：等待目标地址命中，并且注错信号有效</span><br><span class="line">Final：触发抓波形</span><br></pre></td></tr></table></figure>
-<h2 id="信号选择中的两个坑">4.3 信号选择中的两个坑</h2>
-<p><strong>第一，Trigger 条件必须使用工具支持的 Reg 类型信号。</strong>
-曾在信号列表中看到一个地址信号，但设置 Trigger
-时报告类型不支持；检查后发现它是 Net。换用同通路上可触发的 Reg
-信号后问题解决。</p>
-<p><strong>第二，顶层地址不等于控制器内部实际访问地址。</strong>
-初期以顶层完整地址作为条件，无法稳定命中；结合控制器内部 AHB
-地址信号后，改用目标寄存器的低位偏移与注错信号组合，才能准确抓取目标事务。</p>
-<p>因此，波形调试不是“找到同名信号”这么简单，而是要确认：</p>
-<ul>
-<li>信号属于哪一层协议和哪一段通路；</li>
-<li>是组合 Net 还是可采样 Reg；</li>
-<li>地址是全局地址、从接口地址还是模块内偏移；</li>
-<li>有效条件是否还需要 <code>valid/ready</code>、写选通或事务方向；</li>
-<li>Trigger 命中后，Parity 状态和中断是否在同一事务之后变化。</li>
-</ul>
-<h2 id="波形在问题定性中的作用">4.4 波形在问题定性中的作用</h2>
-<p>我通常做两组对照：</p>
+<p>Strato 属于硬件仿真平台，不应与纯软件指令模拟器混淆。Siemens
+当前公开资料描述的是更新一代 Strato
+CS；可用于理解平台定位，不能据此推断旧版工程的 AVB 数量、命令或 trace
+限制。[1]</p>
+<h2 id="角色必须一致">角色必须一致</h2>
 <table>
 <colgroup>
-<col style="width: 46%">
-<col style="width: 53%">
-</colgroup>
-<thead>
-<tr class="header">
-<th>对照组</th>
-<th>目的</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td>能产生中断的通路 vs 不能产生中断的通路</td>
-<td>比较激励、注错、状态、中断链路的第一个分叉点</td>
-</tr>
-<tr class="even">
-<td>单条执行失败 vs 顺序执行成功</td>
-<td>检查前序用例是否提供了隐式初始化</td>
-</tr>
-<tr class="odd">
-<td>Host 版本 vs Device 版本</td>
-<td>排除 DUT 集成模式和测试方法差异</td>
-</tr>
-<tr class="even">
-<td>默认 Buffer vs SRAM Buffer</td>
-<td>确认 DMA 是否真正经过目标 NoC 通路</td>
-</tr>
-</tbody>
-</table>
-<p>波形最终帮助确认：部分自动生成的 Parity
-用例在触发地址、触发参数或前置条件上存在问题，需要重新整理，而不是继续盲目调整中断代码。</p>
-<h1 id="parity-功能安全用例的设计方法">5. Parity
-功能安全用例的设计方法</h1>
-<h2 id="先按总线角色分类而不是按寄存器表机械生成">5.1
-先按总线角色分类，而不是按寄存器表机械生成</h2>
-<p>USB 相关 Parity 通路至少分为两类：</p>
-<ol type="1">
-<li><strong>CSR Slave 通路</strong>：CPU 读写 USB 控制器、CSR、CR、TCA
-等配置寄存器，覆盖 AXI/AHB/APB 的地址和返回数据校验。</li>
-<li><strong>DMA Master 通路</strong>：USB 控制器读写 Event
-Ring、TRB、数据 Buffer，覆盖控制器到系统 NoC/SRAM/DDR
-的地址和数据校验。</li>
-</ol>
-<p>这两类通路的激励完全不同：</p>
-<ul>
-<li>CSR 通路通常由 CPU 对目标寄存器执行一次读或写即可触发。</li>
-<li>DMA 通路需要控制器完成初始化，并在合适的 Host 连接、Endpoint、Event
-Ring、TRB 和 Buffer 状态下发起事务。</li>
-</ul>
-<p>如果不区分这两类，只执行“写注错寄存器 +
-等中断”，会出现大量假失败。</p>
-<h2 id="用数据描述用例但执行框架必须显式管理状态">5.2
-用数据描述用例，但执行框架必须显式管理状态</h2>
-<p>将用例抽象为描述表有利于维护，典型字段包括：</p>
-<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">parity_case</span> &#123;</span></span><br><span class="line">    <span class="type">uintptr_t</span> inject_reg;</span><br><span class="line">    u32 inject_mask;</span><br><span class="line">    <span class="type">uintptr_t</span> enable_reg;</span><br><span class="line">    u32 enable_mask;</span><br><span class="line">    <span class="type">uintptr_t</span> status_reg;</span><br><span class="line">    u32 status_mask;</span><br><span class="line">    <span class="type">uintptr_t</span> clear_reg;</span><br><span class="line">    u32 clear_mask;</span><br><span class="line">    <span class="type">uintptr_t</span> irq_mask_reg;</span><br><span class="line">    u32 irq_mask;</span><br><span class="line">    u32 irq;</span><br><span class="line">    <span class="class"><span class="keyword">enum</span> <span class="title">trigger_type</span> <span class="title">trigger</span>;</span></span><br><span class="line">    <span class="class"><span class="keyword">enum</span> <span class="title">buffer_mem</span> <span class="title">buffer</span>;</span></span><br><span class="line">    <span class="type">bool</span> need_usb_probe;</span><br><span class="line">    <span class="type">bool</span> need_extra_init;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
-<p>但“表驱动”不等于“无状态”。每条用例仍要明确：</p>
-<ul>
-<li>是否解锁写保护；</li>
-<li>是否需要重新执行 USB probe/prepare；</li>
-<li>Buffer 应该在 DDR 还是 SRAM；</li>
-<li>初始 Mask 状态是什么；</li>
-<li>哪些旧状态需要清除；</li>
-<li>触发方式是 CPU CSR 访问还是 USB DMA；</li>
-<li>中断超时时间和清理顺序是什么。</li>
-</ul>
-<h2 id="单条用例的标准闭环">5.3 单条用例的标准闭环</h2>
-<figure class="highlight text"><table><tr><td class="code"><pre><span class="line">1. probe/prepare：确保控制器和测试环境处于已知状态</span><br><span class="line">2. 保存并设置 Mask：阻断无关中断，建立干净起点</span><br><span class="line">3. 使能对应 Parity 机制</span><br><span class="line">4. 配置目标 Buffer / Endpoint / Event Ring / TRB</span><br><span class="line">5. 设置注错位</span><br><span class="line">6. 发起目标 CSR 或 DMA 事务</span><br><span class="line">7. 等待中断或超时，同时读取状态寄存器</span><br><span class="line">8. 验证：目标状态位置位，正确中断被捕获</span><br><span class="line">9. Mask 对应中断，再次激励：不应产生新的中断上报</span><br><span class="line">10. 清除旧状态和中断，恢复现场</span><br><span class="line">11. 禁用安全机制后重复激励：不应产生对应功能安全中断</span><br></pre></td></tr></table></figure>
-<p>需要区分 <strong>状态位</strong> 和 <strong>中断输出</strong>：Mask
-通常只阻止中断传播，不应被错误地解释为“状态位也不能置位”；旧状态未清除时，即使
-Mask 已设置，状态寄存器仍可能保持原值。</p>
-<h2 id="单条与全量是两种不同的测试">5.4 单条与全量是两种不同的测试</h2>
-<p>项目中出现过以下典型现象：</p>
-<ul>
-<li>某用例单独执行失败，放在全量序列中却成功。</li>
-<li>执行前一条用例后，再执行目标用例就成功。</li>
-<li>修改 Mask 和清理策略后，通过项发生变化。</li>
-<li>为部分 DMA 用例增加独立 probe/prepare
-后，单条和顺序执行都稳定。</li>
-</ul>
-<p>这说明前序用例提供了隐式初始化。最终处理不是“规定必须按某个顺序跑”，而是把隐式依赖变成每条用例自己的显式前置条件，同时保留两类回归：</p>
-<ul>
-<li><strong>单条执行</strong>：验证自包含性。</li>
-<li><strong>顺序全量</strong>：验证清理和状态隔离。</li>
-</ul>
-<p>最终仿真阶段核心通路从多项不稳定推进到顺序全通过；样片阶段对原始条目去重、合并并重新整理为
-20 条有效用例，完成 20/20 全量通过。中间版本的 30 条用例曾达到
-26/30，该数据只是过程状态，不作为最终结果。</p>
-<h1 id="关键问题与根因复盘">6. 关键问题与根因复盘</h1>
-<h2 id="位环境下的-mmio-宽度错误synchronous-abort">6.1 64 位环境下的
-MMIO 宽度错误：Synchronous Abort</h2>
-<p>问题现象是访问某些 32 位 CSR 时触发
-<code>Synchronous Abort</code>。最初怀疑过写保护、基地址、Parity
-使能、寄存器是否可访问等多个方向，最后定位到位操作宏：</p>
-<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="comment">/* 错误示例：在 LP64 的 AArch64 环境中，unsigned long 为 64 位 */</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> REG_BIT_SET32(addr, mask) \</span></span><br><span class="line"><span class="meta">    (*(volatile unsigned long *)(addr) |= (mask))</span></span><br><span class="line"></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> REG_BIT_CLEAR32(addr, mask) \</span></span><br><span class="line"><span class="meta">    (*(volatile unsigned long *)(addr) &amp;= ~(mask))</span></span><br></pre></td></tr></table></figure>
-<p>这会把名为“32”的寄存器操作变成 64 位 MMIO 事务。在该 CSR
-总线上触发了同步异常。<code>volatile</code>
-只能约束编译器优化，<strong>不能保证访问宽度正确</strong>。</p>
-<p>修复方式是统一使用明确的 32 位类型和平台 MMIO 接口：</p>
-<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="comment">/* 裸机环境的语义示例 */</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> REG32_READ(addr)  (*(volatile u32 *)(uintptr_t)(addr))</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> REG32_WRITE(addr, value) \</span></span><br><span class="line"><span class="meta">    (*(volatile u32 *)(uintptr_t)(addr) = (u32)(value))</span></span><br><span class="line"></span><br><span class="line"><span class="type">static</span> <span class="keyword">inline</span> <span class="type">void</span> <span class="title function_">reg32_set_bits</span><span class="params">(<span class="type">uintptr_t</span> addr, u32 mask)</span></span><br><span class="line">&#123;</span><br><span class="line">    REG32_WRITE(addr, REG32_READ(addr) | mask);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>Linux 驱动中则应使用 <code>readl()/writel()</code> 和
-<code>void __iomem *</code>，不要自行把物理地址强转为普通指针。</p>
-<p>这次问题还暴露出一个工程缺陷：寄存器封装宏的名称、类型和实际访问宽度不一致。修复不能只改当前失败的一行，而要检查同文件及相应用例中的同类宏，避免下一条用例再次踩坑。</p>
-<h2 id="用例顺序依赖失败来自状态污染而非单一路由错误">6.2
-用例顺序依赖：失败来自状态污染，而非单一路由错误</h2>
-<p>早期全量执行中，通过项会随着
-Mask、清寄存器和执行顺序变化。排查过程不是直接修改注错位，而是建立最小复现：</p>
-<figure class="highlight text"><table><tr><td class="code"><pre><span class="line">case N 单独执行             → 失败</span><br><span class="line">case N-1 后执行 case N       → 成功</span><br><span class="line">case N 增加独立 probe/prepare → 成功</span><br><span class="line">全量执行                     → 验证清理是否影响后续用例</span><br></pre></td></tr></table></figure>
-<p>根因是部分 DMA 用例假定控制器已经由其他用例初始化，同时中断
-Mask、旧状态和 USB 连接状态没有完全隔离。</p>
-<p>修复原则：</p>
-<ul>
-<li>每条用例都能独立完成必要的控制器初始化。</li>
-<li>初始化阶段按寄存器语义设置全局 Mask，阻断无关来源。</li>
-<li>打印注错、Enable、Status、Clear、Mask
-等完整状态，而不是只打印“无中断”。</li>
-<li>清理时区分“本用例应清除的状态”和“不能随意破坏的控制器状态”。</li>
-<li>将单条执行和顺序执行同时纳入验收。</li>
-</ul>
-<h2 id="sram-buffer-未真正切换配置存在但运行路径被覆盖">6.3 SRAM Buffer
-未真正切换：配置存在，但运行路径被覆盖</h2>
-<p>两个目标通路的用例要求 USB 控制器访问 SRAM，但始终不能触发预期
-Parity。代码看似支持 SRAM，实际初始化却存在两处问题：</p>
-<ul>
-<li>Buffer 选择变量初值不是目标默认值；</li>
-<li>初始化函数又使用固定默认内存调用切换函数，覆盖了调用方配置。</li>
-</ul>
-<p>因此，“配置了 SRAM”只是源码层面的假设，真实 DMA 仍访问默认
-Buffer，自然不会命中 SRAM 对应的 NoC 校验通路。修复为：初始化使用当前
-Buffer 选择变量，不再强制覆盖；随后两个用例均通过。</p>
-<p>这个案例的通用价值是：</p>
-<blockquote>
-<p>对影响硬件通路的关键配置，必须验证“有效值”和“实际事务”，不能只验证配置接口被调用。</p>
-</blockquote>
-<p>可采用的证据包括：打印最终生效的 Buffer
-类型和地址、读取运行时变量、观察 DMA
-地址波形、对目标内存做可访问性检查。</p>
-<h2 id="软复位与-event-buffer-卡住先验证模式再验证驱动">6.4 软复位与
-Event Buffer 卡住：先验证模式，再验证驱动</h2>
-<p>曾观察到：</p>
-<ul>
-<li>DWC3 <code>DCTL</code> 软复位后，等待复位位清除时超时；</li>
-<li>配置 Event Buffer 地址寄存器时无响应。</li>
-</ul>
-<p>我按以下顺序排查：</p>
-<ol type="1">
-<li>检查 <code>DCTL</code> 寄存器偏移、Reset bit 和等待条件。</li>
-<li>检查 Event Buffer 的对齐、地址范围和 CPU 可访问性。</li>
-<li>在寄存器写前后增加日志，确认卡住点。</li>
-<li>使用最小寄存器读写命令验证目标地址。</li>
-<li>对比 Host 与 Device 仿真版本。</li>
-</ol>
-<p>切换到正确的 Device
-版本后，这些问题不再出现。说明在复杂仿真环境中，<strong>同样的软件异常可能由
-DUT
-集成模式、时钟/复位或连接模型不匹配引起</strong>，不能只从驱动代码内部寻找原因。</p>
-<h2 id="自动生成的用例不等于正确用例">6.5
-自动生成的用例不等于正确用例</h2>
-<p>部分条目最初来自自动生成或表格转换。后续通过波形发现，若干失败项的触发地址、触发参数或初始化要求与实际通路不一致。最终采取：</p>
-<ul>
-<li>从地址互联表和 RTL 通路重新确认 Master/Slave 方向；</li>
-<li>将 <code>ARADDR/AWADDR/WDATA/RDATA</code> 与具体激励一一对应；</li>
-<li>对重复条目去重，对同一通路的读写和地址/数据项重新组织；</li>
-<li>为每项记录 Buffer、额外初始化、中断来源和预期 Mask 行为；</li>
-<li>用单条、全量、样片三轮结果闭环。</li>
-</ul>
-<p>这使测试从“表格条目执行器”转变为“基于硬件通路的验证方案”。</p>
-<h1 id="一套可复用的问题定位框架">7. 一套可复用的问题定位框架</h1>
-<p>遇到“USB 卡死”或“Parity
-无中断”时，我按以下层次二分，而不是同时修改多个变量：</p>
-<h2 id="第一层平台是否成立">第一层：平台是否成立</h2>
-<ul>
-<li>RTL/仿真版本是否正确，Host/Device 模式是否匹配？</li>
-<li>安全核和应用核镜像是否匹配？</li>
-<li>链接、加载、释放地址是否一致？</li>
-<li>时钟、复位、UART、资源划分是否正常？</li>
-</ul>
-<h2 id="第二层寄存器访问是否成立">第二层：寄存器访问是否成立</h2>
-<ul>
-<li>基地址和偏移是否来自同一版本文档？</li>
-<li>MMIO 宽度、对齐和 <code>volatile</code> 是否正确？</li>
-<li>写保护是否已按顺序解锁？</li>
-<li>目标寄存器是否允许在当前控制器状态下访问？</li>
-</ul>
-<h2 id="第三层usb-事务是否成立">第三层：USB 事务是否成立</h2>
-<ul>
-<li>软复位是否完成，控制器状态是否允许继续配置？</li>
-<li>Event Ring/TRB/Buffer 地址是否有效、对齐、可访问？</li>
-<li>Device 是否已连接到 Host，是否已有目标 DMA 活动？</li>
-<li>DMA 实际访问 DDR 还是 SRAM，是否经过目标通路？</li>
-</ul>
-<h2 id="第四层错误检测与中断是否成立">第四层：错误检测与中断是否成立</h2>
-<ul>
-<li>注错位是否写成功，Enable 是否有效？</li>
-<li>注错是否与目标事务在时间上重叠？</li>
-<li>Status 是否置位，还是只有中断没到？</li>
-<li>Mask、GIC 中断号、处理函数注册是否正确？</li>
-<li>旧状态是否未清，清理顺序是否影响下一次测试？</li>
-</ul>
-<h2 id="第五层测试方法是否成立">第五层：测试方法是否成立</h2>
-<ul>
-<li>单条和全量结果是否一致？</li>
-<li>是否存在前序用例隐式初始化？</li>
-<li>参考用例能否在相同环境通过？</li>
-<li>是否一次只修改一个变量并保留日志、配置和波形？</li>
-</ul>
-<p>这套顺序的核心是：<strong>先证明激励存在，再证明检测生效，最后证明中断软件正确。</strong></p>
-<h1 id="向-linux-usb-驱动-bring-up-的迁移">8. 向 Linux USB 驱动 Bring-up
-的迁移</h1>
-<h2 id="裸机经验与-linux-驱动的对应关系">8.1 裸机经验与 Linux
-驱动的对应关系</h2>
-<table>
-<colgroup>
+<col style="width: 10%">
 <col style="width: 37%">
-<col style="width: 62%">
+<col style="width: 52%">
 </colgroup>
 <thead>
 <tr class="header">
-<th>仿真/裸机中的问题</th>
-<th>Linux Bring-up 中的对应点</th>
+<th>DUT 角色</th>
+<th>配套工程与对端</th>
+<th>软件对象</th>
 </tr>
 </thead>
 <tbody>
 <tr class="odd">
-<td>基地址、启动模式、寄存器文档不一致</td>
-<td>Device Tree、<code>reg/ interrupts/ clocks/ resets/ phys</code>
-与原理图、手册交叉核对</td>
+<td>USB Host</td>
+<td>Host 版硬件模型 + 虚拟 USB Device</td>
+<td>xHCI 控制器、设备枚举、Command/Transfer/Event Ring</td>
 </tr>
 <tr class="even">
-<td><code>unsigned long *</code> 导致 MMIO 宽度错误</td>
-<td><code>readl/writel</code>、<code>void __iomem *</code>、必要时 64 位
-MMIO 拆写</td>
-</tr>
-<tr class="odd">
-<td>Event Buffer/TRB 地址无效</td>
-<td><code>dma_alloc_coherent()</code>、DMA mask、IOMMU/SMMU 映射</td>
-</tr>
-<tr class="even">
-<td>DDR/SRAM Buffer 未按预期切换</td>
-<td><code>dma_addr_t</code> 实际值、DMA
-映射方向、地址解码和通路确认</td>
-</tr>
-<tr class="odd">
-<td>Parity 中断无响应</td>
-<td>IRQ 号、GIC 类型、中断状态/Mask、线程化处理与清中断顺序</td>
-</tr>
-<tr class="even">
-<td>Host/Device 版本混用</td>
-<td><code>dr_mode</code>、USB role switch、PHY 模式、xHCI/DWC3
-驱动匹配</td>
-</tr>
-<tr class="odd">
-<td>软复位等待超时</td>
-<td>clock/reset/power domain/PHY 状态和超时后的寄存器转储</td>
-</tr>
-<tr class="even">
-<td>用例状态污染</td>
-<td>probe/remove、suspend/resume、错误回滚后的资源与硬件状态恢复</td>
+<td>USB Device</td>
+<td>Device 版硬件模型 + QEMU 等外部 Host</td>
+<td>DWC3 设备控制、端点命令、TRB、设备事件缓冲区</td>
 </tr>
 </tbody>
 </table>
-<p>其中 DMA API、Device Tree 和 Linux
-驱动模型属于迁移后的工程实践，不是原项目中已经完成的 Linux
-开发内容。</p>
-<h2 id="回片前我会优先确认的事项">8.2 回片前我会优先确认的事项</h2>
+<p><strong>不能用 Device 初始化流程验证 Host 工程，反之亦然。</strong>
+原始记录中，设备控制软复位和事件缓冲区配置异常在切换为匹配的 Device
+工程后不再出现；因此应先核对角色，再分析寄存器、链路或安全机制。</p>
+<h1 id="strato-工程结构">Strato 工程结构</h1>
+<h2 id="交付工程与用户-shadow">交付工程与用户 shadow</h2>
+<p>原始环境通过 <code>make shadow</code>
+创建用户运行空间。以下为脱敏后的关键关系；<code>comp/</code>、同级
+<code>swfile/</code>
+及镜像相对引用是使用重点，其余目录随交付版本变化。</p>
+<figure class="highlight text"><table><tr><td class="code"><pre><span class="line">&lt;strato-root&gt;/</span><br><span class="line">├── &lt;tag&gt;/comp/                     # 公共交付工程，避免直接修改</span><br><span class="line">└── shadow/&lt;user&gt;/&lt;tag&gt;/             # 用户运行副本</span><br><span class="line">    ├── comp/</span><br><span class="line">    │   ├── SourceMe                # 工程环境初始化</span><br><span class="line">    │   ├── Makefile                # shadow、run 等工程目标</span><br><span class="line">    │   ├── run.tcl                 # 时钟、复位、镜像加载与启动</span><br><span class="line">    │   ├── include.tcl             # 可选公共 Tcl 函数</span><br><span class="line">    │   ├── trig.tcl                # 用户维护的抓波形脚本</span><br><span class="line">    │   ├── condition.trigger       # 触发条件</span><br><span class="line">    │   ├── sig.list                # 上传信号列表</span><br><span class="line">    │   ├── veloce.wave/            # 原环境的波形输出位置</span><br><span class="line">    │   └── veloce.med/             # 运行状态及协同模型相关文件</span><br><span class="line">    └── swfile/</span><br><span class="line">        ├── &lt;secure-rom&gt;.hex        # 安全核 ROM 镜像或引导镜像</span><br><span class="line">        ├── secure/bin[0-7].raw     # RAM 启动时的分片，数量依模型而定</span><br><span class="line">        └── &lt;application-*.hex&gt;     # 应用核镜像，可能按存储器通道拆分</span><br></pre></td></tr></table></figure>
+<p><code>comp/run.tcl</code> 通常通过 <code>../swfile/</code>
+引用镜像。不要将 <code>swfile/</code> 误放到 <code>comp/</code>
+下，也不要把某版本的存储器实例路径直接复制给另一版本。</p>
+<h2 id="裸驱与启动固件">裸驱与启动固件</h2>
+<figure class="highlight text"><table><tr><td class="code"><pre><span class="line">&lt;baremetal-root&gt;/</span><br><span class="line">├── arch/a55/configs/               # 原工程目录名，不等同于实际运行核型号</span><br><span class="line">├── arch/a55/boot/                  # ELF/RAW/HEX 等构建产物</span><br><span class="line">├── module/usb3/                    # USB 初始化、Host/Device、功能安全入口</span><br><span class="line">├── module/noc/                     # 互连注错框架与用例数据</span><br><span class="line">└── include/                        # 平台地址、寄存器及访问接口</span><br><span class="line"></span><br><span class="line">&lt;secure-fw-root&gt;/</span><br><span class="line">├── arch/R52_SECURE/                # ROM/SRAM 链接脚本</span><br><span class="line">├── project/secure_r52/</span><br><span class="line">│   ├── make.sh</span><br><span class="line">│   └── secure_output/             # ROM、RAM 分片等输出</span><br><span class="line">└── project/safety_r52/             # 按需构建的安全域固件</span><br></pre></td></tr></table></figure>
+<p>建议把一次可复现实验的<strong>硬件标签、工具版本、固件版本、构建配置、镜像校验值、<code>run.tcl</code>、AVB
+列表、用例表和日志</strong>一并归档。文件名相同不代表镜像兼容。</p>
+<h1 id="环境准备与-strato-使用">环境准备与 Strato 使用</h1>
+<h2 id="登录与资源选择">登录与资源选择</h2>
 <ol type="1">
-<li><strong>寄存器模型</strong>：保留一份经过仿真验证的最小寄存器读写序列，回片后先执行，不直接从完整枚举开始。</li>
-<li><strong>启动依赖</strong>：明确 clock、reset、power domain、PHY、NoC
-安全和地址翻译的初始化责任归属。</li>
-<li><strong>中断基线</strong>：记录中断号、状态位、Mask
-和清除语义，准备轮询状态寄存器的兜底诊断。</li>
-<li><strong>DMA 基线</strong>：准备 Event Ring、单个 TRB、短 Bulk
-传输三个层次的最小测试，记录 CPU 地址与 DMA 地址。</li>
-<li><strong>Host/Device
-基线</strong>：分别保存可工作的最小配置和连接流程，避免角色问题与协议问题混杂。</li>
-<li><strong>观测点</strong>：保留关键寄存器转储、软件阶段标记、xHCI
-动态日志和总线观测信号清单。</li>
-<li><strong>对照配置</strong>：保存仿真通过版本、样片配置和差异清单，尤其是
-Buffer、启动地址、Cache/MMU 和编译宏。</li>
+<li>按管理要求预约仿真资源，经授权通道登录仿真服务器；图形界面需要 X11
+转发或远程桌面。</li>
+<li>使用与交付工程匹配的 shell。原环境的 <code>SourceMe</code> 按 C
+shell 流程加载，不要混用 Bash 的 <code>export</code> 与 C shell 的
+<code>setenv</code>。</li>
+<li>跨主机认证采用平台批准的 SSH
+密钥或代理方案，<strong>不要复制私钥到各台服务器</strong>。</li>
+<li>加载工程环境后，使用已提供的 <code>free_avb_info</code>
+或资源管理工具查询空闲 AVB。</li>
+<li>同时检查 AVB 数量、顺序、Module
+邻接和工程专用约束，不能只检查“空闲数量足够”。</li>
 </ol>
-<h2 id="回片后的调试顺序">8.3 回片后的调试顺序</h2>
-<figure class="highlight text"><table><tr><td class="code"><pre><span class="line">电源/时钟/复位/PHY</span><br><span class="line">→ MMIO 最小读写</span><br><span class="line">→ 控制器软复位和基础状态</span><br><span class="line">→ 中断状态与 GIC 上报</span><br><span class="line">→ Event Ring 和单个控制传输</span><br><span class="line">→ 枚举</span><br><span class="line">→ Bulk/Interrupt/Isochronous 传输</span><br><span class="line">→ 长时间、并发、异常恢复和功耗管理</span><br></pre></td></tr></table></figure>
-<p>如果枚举失败，不能一上来只看协议日志。应先判断是 MMIO、DMA、IRQ、PHY
-还是协议层问题，再选择寄存器转储、xHCI trace、USB Protocol Analyzer
-或硬件波形。</p>
-<h1 id="面试中可直接使用的项目讲述">9. 面试中可直接使用的项目讲述</h1>
-<h2 id="三分钟版本">9.1 三分钟版本</h2>
-<p>我在一个车载 SoC 项目中负责 USB 裸机驱动及功能安全验证，主要在 Veloce
-Strato 上完成回片前调试，后续迁移到样片。验证范围包括 DWC3 控制器、CPU
-到 USB 的 CSR 配置通路、USB 作为 Master 的 DMA 通路，以及 NoC Parity
-注错到安全中断的完整链路。</p>
-<p>这段工作最有挑战的地方，是问题经常跨软件、RTL、仿真模型和启动环境。我先把
-Host/Device、启动镜像和加载地址等环境变量固定，再把用例拆成“激励、注错、状态、中断、清理”五个阶段。通过
-Strato Trigger
-将目标总线地址和注错信号组合触发，对比通过与失败通路，避免只根据串口日志猜测。</p>
-<p>一个典型问题是 32 位寄存器访问触发 Synchronous
-Abort。最后发现寄存器宏使用了 <code>unsigned long *</code>，在 AArch64
-LP64 环境下实际形成 64 位 MMIO。改成明确的 32
-位访问后问题解决。另一个问题是 SRAM
-通路用例失败，表面看配置已经打开，实际初始化函数强制覆盖 Buffer
-类型，DMA 根本没有走 SRAM。修复有效配置后，用例通过。</p>
-<p>此外，我通过增加每条用例独立的 probe/prepare、统一 Mask
-和清理策略，解决了单条失败而全量成功等顺序依赖。最终将条目去重并重构为
-20 条有效用例，在样片上完成 20/20
-全量通过。这段经历让我形成了一个习惯：先确认硬件事务真实发生，再定位驱动、中断或协议问题。</p>
-<h2 id="简历要点版本">9.2 简历要点版本</h2>
+<p>原 USB 工程存在跨 Module 或特定 AVB
+组合无法启动的记录，也出现过较小工程可运行而 USB
+工程不可运行的情况。这属于<strong>交付版本及映射约束</strong>，不能概括为所有
+Strato 都要求同一数量、偶数起始或连续编号。</p>
+<h2 id="创建运行副本">创建运行副本</h2>
+<p>以下路径为示意，替换后在仿真服务器执行：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">csh</span><br><span class="line">setenv STRATO_ROOT /path/to/strato</span><br><span class="line">setenv USB_TAG &lt;tag&gt;</span><br><span class="line">setenv USB_PRJ $&#123;STRATO_ROOT&#125;/shadow/$&#123;USER&#125;/$&#123;USB_TAG&#125;</span><br><span class="line"></span><br><span class="line">cd $&#123;STRATO_ROOT&#125;/$&#123;USB_TAG&#125;/comp</span><br><span class="line">source SourceMe</span><br><span class="line">make shadow shadow_name=$&#123;USER&#125;</span><br><span class="line"></span><br><span class="line">cd $&#123;USB_PRJ&#125;/comp</span><br><span class="line">source SourceMe</span><br></pre></td></tr></table></figure>
+<p>已有 shadow
+时直接进入并检查版本，避免重复创建覆盖本地修改。切换工程应使用干净
+shell，仅加载当前
+<code>SourceMe</code>；原始记录有因混入其他环境变量而出现未知信号或启动异常的情况。</p>
+<h2 id="加载镜像并启动">加载镜像并启动</h2>
+<p>先检查 <code>run.tcl</code> 的镜像路径、存储器实例、时钟、复位和启动
+strap，再启动：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line"># 仿真服务器，comp/ 目录</span><br><span class="line">source SourceMe</span><br><span class="line">make run avb=&lt;已分配且满足工程约束的AVB列表&gt;</span><br></pre></td></tr></table></figure>
+<figure class="highlight tcl"><table><tr><td class="code"><pre><span class="line"><span class="comment"># velrun 控制台</span></span><br><span class="line">do run.tcl</span><br></pre></td></tr></table></figure>
+<p>进入安全核串口后释放应用核。原裸机监控程序的命令如下，仅适用于保留这些接口的固件：</p>
+<table>
+<thead>
+<tr class="header">
+<th>启动介质</th>
+<th>安全核串口命令</th>
+<th>前提</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>DDR</td>
+<td><code>mp4c0ddr0</code></td>
+<td>应用镜像已经加载至匹配的 DDR 区域</td>
+</tr>
+<tr class="even">
+<td>SRAM</td>
+<td><code>mp4c0ssram</code></td>
+<td>链接、加载和复位入口均指向 SRAM</td>
+</tr>
+<tr class="odd">
+<td>QSPI</td>
+<td><code>mp4c0qspi0</code></td>
+<td>当前模型与启动固件支持该启动链路</td>
+</tr>
+</tbody>
+</table>
+<p>安全核和应用核通常使用不同 UART；以当前 <code>run.tcl</code>
+和固件配置确认映射，不固定串口编号。验收顺序为：安全核命令行可用 →
+应用核启动 → USB 基础初始化 → 对端连接 → 测试。</p>
+<h2 id="常用控制命令">常用控制命令</h2>
+<table>
+<colgroup>
+<col style="width: 20%">
+<col style="width: 27%">
+<col style="width: 51%">
+</colgroup>
+<thead>
+<tr class="header">
+<th><code>velrun</code> 命令</th>
+<th>用途</th>
+<th>注意</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>do run.tcl</code></td>
+<td>执行启动脚本</td>
+<td>重复执行可能重新加载镜像、覆盖状态</td>
+</tr>
+<tr class="even">
+<td><code>run</code></td>
+<td>运行模型时钟</td>
+<td>仿真时间与墙上时间不同</td>
+</tr>
+<tr class="odd">
+<td><code>run -stop</code></td>
+<td>暂停模型时钟</td>
+<td>抓 trace 或修改采集配置前使用</td>
+</tr>
+<tr class="even">
+<td><code>reinit</code></td>
+<td>重新初始化当前运行环境</td>
+<td>随后重新执行启动脚本；不等于复位外部 QEMU</td>
+</tr>
+<tr class="odd">
+<td><code>source trig.tcl</code></td>
+<td>执行波形脚本</td>
+<td>若包含 <code>waitfor trigger</code>，控制台会同步等待</td>
+</tr>
+</tbody>
+</table>
+<p>原环境也使用 <code>source run.tcl</code>。<code>do</code> 与
+<code>source</code>
+的可用性和细节应查当前版本帮助，不依据单次使用经验认定完全等价。更换 RTL
+编译产物或 AVB 映射时，重新启动仿真会话，不只执行
+<code>reinit</code>。</p>
+<h2 id="断点保存与恢复">断点保存与恢复</h2>
+<p>原工程提供如下 checkpoint 流程：</p>
+<figure class="highlight tcl"><table><tr><td class="code"><pre><span class="line"><span class="comment"># 保存前停止运行；原版本使用 stop</span></span><br><span class="line">stop</span><br><span class="line">checkpoint save -name snapshot.stw</span><br><span class="line"></span><br><span class="line"><span class="comment"># 在相同工程、相同镜像和相同启动脚本下恢复</span></span><br><span class="line">do run.tcl</span><br><span class="line"><span class="comment"># 等待初始化到原流程要求的阶段后暂停</span></span><br><span class="line">stop</span><br><span class="line">checkpoint restore -name snapshot.stw</span><br><span class="line">run</span><br></pre></td></tr></table></figure>
+<p><code>stop</code> 与 <code>run -stop</code>
+的支持范围以本机帮助为准。Checkpoint
+不应被视为自动保存了外部虚拟机、网络连接及 USB
+协同模型的全部状态；恢复后仍须验证对端和链路的一致性。</p>
+<h1 id="镜像构建与加载一致性">镜像构建与加载一致性</h1>
+<h2 id="启动链路">启动链路</h2>
+<table>
+<colgroup>
+<col style="width: 18%">
+<col style="width: 32%">
+<col style="width: 48%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>组件与方式</th>
+<th>必要产物</th>
+<th>一致性检查</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>安全核 ROM 启动</td>
+<td>完整 ROM HEX</td>
+<td>ROM 链接脚本、ECC/格式转换、存储器实例匹配</td>
+</tr>
+<tr class="even">
+<td>安全核 SRAM 启动</td>
+<td>小型 ROM 引导文件 + RAM 分片</td>
+<td>分片数量、位宽、交织方式及入口匹配</td>
+</tr>
+<tr class="odd">
+<td>应用核 DDR 启动</td>
+<td>对应 DDR 模型的 HEX/分片</td>
+<td>链接地址、模型映射和释放命令匹配</td>
+</tr>
+<tr class="even">
+<td>应用核 SRAM 启动</td>
+<td>SRAM 可加载镜像</td>
+<td>容量足够，代码、栈与 DMA 区域不重叠</td>
+</tr>
+</tbody>
+</table>
+<p>修改启动位置必须同步检查
+<code>CONFIG_SYS_TEXT_BASE</code>、<code>CONFIG_RELOC_SYS_TEXT_BASE</code>、重定位区域大小、链接脚本及
+<code>run.tcl</code>，不能只改入口地址。原记录中的大地址 DDR 布局是特定
+SoC 配置，本文不沿用具体数值。</p>
+<p>安全核固件未修改时，优先使用随当前硬件工程验证过的配套镜像。需要重新构建时，确认生成
+ROM 所需的 ECC 和格式转换工具齐备；不能将普通 RAW 文件直接当成 ROM HEX
+使用。</p>
+<h2 id="裸驱构建检查">裸驱构建检查</h2>
+<p>原工程通过平台封装脚本选择 <code>usb</code> 或 <code>usb_fusa</code>
+构建目标。以下为<strong>接口示意</strong>，构建入口名称已泛化，必须替换为实际脚本，不是可直接复制执行的命令：</p>
+<figure class="highlight text"><table><tr><td class="code"><pre><span class="line">./&lt;平台构建脚本&gt; usb</span><br><span class="line">./&lt;平台构建脚本&gt; usb_fusa</span><br></pre></td></tr></table></figure>
+<p>构建后检查最终配置和 ELF/map 文件，而不只检查 defconfig：</p>
 <ul>
-<li>基于 Veloce Strato 搭建 USB Host/Device 协同仿真与 QEMU Linux
-联调环境，完成安全核/应用核镜像、启动脚本及硬件资源匹配。</li>
-<li>调试 DWC3 裸机驱动与 NoC Parity 功能安全用例，覆盖 CSR 和 DMA
-两类通路，以及注错、状态、Mask、中断和恢复闭环。</li>
-<li>使用硬件事务 Trigger、对照波形和最小复现定位 MMIO
-位宽、控制器状态、Buffer 路由及用例状态污染问题。</li>
-<li>将仿真用例迁移至样片，修复运行配置差异，最终完成重构后 20/20
-条功能安全用例全量通过。</li>
+<li>仿真/样片目标、Host/Device 测试与命令入口是否启用；</li>
+<li>UART、中断控制器、缓存及内存映射是否匹配当前环境；</li>
+<li>代码、栈、事件区和数据缓冲区是否在预期范围；</li>
+<li>HEX 转换是否保留高地址和正确的通道拆分；</li>
+<li><code>run.tcl</code>
+是否实际加载了本次产物，而非旧目录中的同名文件。</li>
 </ul>
-<h1 id="可能的面试追问与回答要点">10. 可能的面试追问与回答要点</h1>
-<h2 id="q1strato-与普通软件仿真相比调试上最大的区别是什么">Q1：Strato
-与普通软件仿真相比，调试上最大的区别是什么？</h2>
-<p>Strato 属于硬件仿真加速平台，能运行较大规模 SoC RTL 并连接 QEMU
-等虚拟外设，但启动、抓波形和资源分配成本更高。因此调试重点不是无限加日志，而是先建立稳定
-Checkpoint，再用精确 Trigger
-和最小用例减少迭代时间。同时必须记录资源划分和工程版本，因为这些也是实验变量。</p>
-<h2 id="q2如何判断没有中断是硬件问题还是软件问题">Q2：如何判断“没有中断”是硬件问题还是软件问题？</h2>
-<p>把问题拆开：先读注错和
-Enable，确认配置生效；用波形或事务日志确认目标访问发生；再读 Parity
-Status。如果 Status 没置位，优先检查激励和检测通路；如果 Status
-已置位而中断没到，再检查 Mask、GIC 中断号、处理函数和清中断顺序。Mask
-测试还要区分状态保持与中断传播。</p>
-<h2 id="q3为什么-volatile-unsigned-long-不适合通用-32-位-mmio">Q3：为什么
-<code>volatile unsigned long *</code> 不适合通用 32 位 MMIO？</h2>
-<p><code>volatile</code>
-只防止编译器合并或删除访问，不决定硬件位宽。<code>unsigned long</code>
-的宽度由 ABI 决定，在 AArch64 LP64 下是 64 位，可能生成 64 位
-load/store。32 位外设寄存器应使用 <code>u32</code>/<code>uint32_t</code>
-和平台规定的 MMIO 接口，Linux 中使用 <code>readl/writel</code>。</p>
-<h2 id="q4为什么-parity-用例需要-usb-host-参与">Q4：为什么 Parity
-用例需要 USB Host 参与？</h2>
-<p>对于 CSR Slave 通路，CPU 寄存器读写通常就够了；但 DMA Master 通路需要
-Device 控制器产生真实的 Event/TRB/Data 事务。Device 未连接 Host
-时，可能没有预期的 DMA 活动，注错再正确也不会被目标事务采样。因此 Host
-连接是部分用例的激励条件，而不是可有可无的外部步骤。</p>
-<h2 id="q5单条失败全量成功说明什么">Q5：单条失败、全量成功说明什么？</h2>
-<p>通常说明用例缺少自包含初始化，依赖前序用例留下的 probe、Mask、Buffer
-或控制器状态。应通过最小序列找到依赖项，把依赖显式放入本用例
-prepare，同时保留全量测试检查清理是否污染后续用例，不能用固定执行顺序掩盖问题。</p>
-<h2 id="q6仿真通过后样片为什么仍可能失败">Q6：仿真通过后，样片为什么仍可能失败？</h2>
-<p>两者编译宏、启动介质、Cache/MMU、时钟频率、PHY、Buffer
-默认位置和虚拟外设模型可能不同。原项目中就出现过 Buffer
-切换代码在目标配置下未生效的问题。因此迁移时应比较“最终运行配置”和“真实硬件事务”，不能只比较源码版本。</p>
-<h2 id="q7这段经验对-linux-驱动工程师最重要的能力是什么">Q7：这段经验对
-Linux 驱动工程师最重要的能力是什么？</h2>
-<p>不是记住某个控制器的寄存器，而是建立跨层定位能力：能从 Linux
-日志回到驱动状态，从驱动状态回到
-MMIO/DMA/IRQ，从事务再回到硬件波形；同时能把环境、驱动、测试方法和 RTL
-问题分开验证。</p>
-<h1 id="总结">11. 总结</h1>
-<p>这段项目经验可以概括为三句话：</p>
+<p>仿真时避免无必要的大范围 DDR 清零。长时间停在 <code>memset</code>
+不一定是死机，应结合仿真时间和总线活动判断，再缩小到实际使用的缓冲区。</p>
+<h1 id="usb-裸驱测试">USB 裸驱测试</h1>
+<h2 id="建议验证顺序">建议验证顺序</h2>
+<p>按“最小访问 → 基础功能 → 真实 DMA → 注错 → 回归”推进：</p>
 <ol type="1">
-<li><strong>仿真环境本身也是系统</strong>：版本、镜像、启动地址、DUT
-角色、资源和虚拟外设必须作为一个整体验证。</li>
-<li><strong>驱动调试必须落到真实事务</strong>：寄存器写入成功不代表硬件行为正确，配置存在也不代表目标路径真正被使用。</li>
-<li><strong>高质量验证必须可重复且自包含</strong>：单条与全量都要通过，注错、状态、中断、Mask
-和清理都要形成闭环。</li>
+<li><strong>MMIO
+冒烟</strong>：读取合法且无副作用的标识/状态寄存器，核对访问宽度。</li>
+<li><strong>基础初始化</strong>：验证时钟、复位、角色、PHY/虚拟链路和普通中断。</li>
+<li><strong>控制传输</strong>：完成枚举，核对描述符与 EP0 请求。</li>
+<li><strong>数据传输</strong>：执行有明确内容、长度和方向的传输，核对完成事件及数据。</li>
+<li><strong>功能安全</strong>：为已证实经过目标通路的事务增加 parity
+注错。</li>
+<li><strong>独立性回归</strong>：冷启动单条、顺序全量、重复执行，比较前后状态。</li>
 </ol>
-<p>对资深 Linux 驱动岗位而言，这些能力可以直接迁移到芯片
-Bring-up：用最小配置建立基线，用寄存器和 DMA
-证据划分问题层次，用动态日志和波形完成跨层定位，并把临时调试手段沉淀成可复用的驱动诊断与回归用例。</p>
+<p>普通 USB 事务尚未跑通时，不要将等待超时直接归因于 parity
+或互连错误。上述顺序是建议的验证层次，不表示原记录覆盖了全部 USB
+传输类型或一致性认证。</p>
+<h2 id="host-与-device-分开初始化">Host 与 Device 分开初始化</h2>
+<p><strong>Device 路径</strong>：配置 DWC3
+设备模式、执行设备软复位、配置设备事件缓冲区和控制端点，再配置数据端点与
+TRB，启动设备并与 Host 枚举。</p>
+<p><strong>Host 路径</strong>：配置主机模式与端口，初始化 xHCI
+的命令环、事件环及设备上下文，处理端口变化并完成枚举，再提交传输并检查完成事件。</p>
+<p>DWC3 设备模式的 <code>DCTL</code>、<code>GEVNTADRLO/HI</code>
+及端点命令，不能代替 xHCI Host
+初始化。代码使用同样的“TRB”术语，也不代表两套控制器接口和事件格式相同。</p>
+<h2 id="对端连接与测试入口">对端连接与测试入口</h2>
+<p>DUT 为 Device 时，启动脚本可能提示需要外部虚拟 Host。按交付脚本启动
+QEMU，并指定匹配的虚拟 USB 类型、Guest 镜像与协同主机。原环境通过
+<code>qemu.pl</code> 封装，参数形式如下：</p>
+<figure class="highlight text"><table><tr><td class="code"><pre><span class="line">perl qemu.pl run --vdevice &lt;虚拟USB类型&gt; \</span><br><span class="line">    --comodel_host &lt;仿真服务器&gt; --guest_os &lt;guest镜像&gt;</span><br></pre></td></tr></table></figure>
+<p>该脚本和参数属于工程集成接口，不是上游 QEMU
+的标准命令行。虚拟设备类型和端口号应使用启动日志给出的值，不固定复制旧版配置。</p>
+<p>在应用核已准备端点、事件缓冲区和传输描述符后，通过当前
+<code>velrun</code>/USB 模型支持的连接接口接入 Host。原记录出现过
+<code>usb connect 3</code> 与 <code>usb_connect 3</code>
+两种写法，<strong>应按实际控制台帮助选择，不能认定它们等价</strong>；数字也是模型端口参数，不泛化为
+USB 速度。</p>
+<p>原测试软件的典型入口为：</p>
+<figure class="highlight text"><table><tr><td class="code"><pre><span class="line"># 应用核裸机控制台：Device 功能安全集合</span><br><span class="line">usb3device test 0x11</span><br><span class="line">usb3device test 0x11 &lt;子用例编号&gt;</span><br><span class="line"></span><br><span class="line"># 应用核裸机控制台：Host parity 调试入口</span><br><span class="line">usb3host test 0x61 &lt;子用例编号&gt;</span><br></pre></td></tr></table></figure>
+<p>这些编号具有软件版本依赖性；原记录还存在旧版集合入口。参数按原程序要求显式写十六进制，例如
+<code>0x10</code>，不要把十进制序号直接传给仅按十六进制解释的解析器。</p>
+<h2 id="位寄存器访问">32 位寄存器访问</h2>
+<p>原记录确认的一项根因是：在 AArch64 构建中，用
+<code>volatile unsigned long *</code> 实现名义上的 32
+位位操作，实际生成了 64 位 MMIO 访问，导致 Synchronous
+Abort。指针本身宽度不是问题，<strong>被解引用的数据类型决定访问宽度</strong>。</p>
+<p>优先使用 BSP 已验证的 <code>readl()</code> / <code>writel()</code>
+或等价 32 位访问器。Linux 风格调用顺序如下：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="comment">/* addr 为已正确映射的 MMIO 地址；仅适用于普通可读写寄存器。 */</span></span><br><span class="line">u32 value = readl(addr);</span><br><span class="line">writel(value | mask, addr);     <span class="comment">/* 参数顺序是 value、address */</span></span><br></pre></td></tr></table></figure>
+<p>裸机访问器也必须明确使用 32
+位数据访问，并实现体系结构要求的端序和屏障。<code>volatile</code>
+不能代替内存屏障；Linux 下应映射 MMIO 后使用 I/O
+API，不能直接解引用硬编码物理地址。</p>
+<p>对
+W1C/W1S、读清除、自清零及写保护寄存器，应按字段定义访问，不能通用地执行读改写。解锁密钥、写保护范围及回锁顺序也必须随当前寄存器表确认。</p>
+<h2 id="dma缓冲区与互连路径">DMA、缓冲区与互连路径</h2>
+<p>区分 CPU 虚拟地址、CPU 物理地址和设备 DMA/总线地址；存在 SMMU
+或桥接映射时，它们不一定相同。[3]</p>
+<ul>
+<li>控制器使用 DMA 地址，CPU 指针不能直接写入 DMA 寄存器。</li>
+<li>Event Buffer、TRB
+和数据区分别检查大小、对齐、高低地址及地址可达性。</li>
+<li>非一致性内存需要正确的 cache
+clean/invalidate；内存屏障不能代替缓存维护。</li>
+<li>一致性 DMA
+内存仍可能需要发布顺序屏障，例如先写描述符内容、再提交有效位。[3]</li>
+<li>Linux 实现使用 DMA API，检查映射失败并管理映射生命周期；裸机按 BSP
+的等价机制实现。</li>
+<li>CPU 校验缓冲区内容前，先确认 DMA 完成并取得内存访问所有权。</li>
+</ul>
+<p><strong>缓冲区位置决定测试通路。</strong> 原记录中，部分用例要求 USB
+DMA 访问 SRAM 才能经过目标互连分支；虽然上层选择了
+SRAM，初始化函数却又强制恢复默认缓冲区，导致注错始终无法触发。修复应做到：</p>
+<ol type="1">
+<li>用例显式选择 DDR/SRAM 等内存类型。</li>
+<li>初始化函数尊重该选择，不再次写死默认类型。</li>
+<li>事件区、TRB 和数据区逐一打印最终地址。</li>
+<li>在 RTL 波形中确认真实总线地址和路由，而不只相信选择变量。</li>
+<li>对需要重新初始化的用例，独立调用
+<code>probe/prepare</code>，避免沿用上一条描述符。</li>
+</ol>
+<h2 id="虚拟存储设备">虚拟存储设备</h2>
+<p>采用 Bulk-Only Transport（BOT）的模型中，CBW 为 31 字节、CSW 为 13
+字节；不要因 C 结构体填充而扩大线上长度。核对
+signature、tag、传输长度、方向、LUN、命令块长度及状态/残余长度；CBW
+signature 数值为 <code>0x43425355</code>，线上采用小端序。</p>
+<p>先使用 INQUIRY、READ CAPACITY
+等命令核对命令阶段、数据阶段和状态阶段，再做读写数据比对。此流程针对
+BOT，不适用于 UAS，也不能把某个模型的 SCSI
+响应固定为所有设备的预期。</p>
+<h1 id="parity-与功能安全验证">Parity 与功能安全验证</h1>
+<h2 id="通路分类">通路分类</h2>
+<table>
+<colgroup>
+<col style="width: 15%">
+<col style="width: 42%">
+<col style="width: 42%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>访问来源</th>
+<th>目标通路</th>
+<th>合适的触发方式</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>CPU 寄存器读写</td>
+<td>配置 NoC → AXI/AHB 转换 → USB 控制器</td>
+<td>对合法寄存器执行指定读/写</td>
+</tr>
+<tr class="even">
+<td>CPU 寄存器读写</td>
+<td>配置 NoC → APB → USB CSR/PHY 配置模块</td>
+<td>使用该模块的专用访问流程</td>
+</tr>
+<tr class="odd">
+<td>USB DMA</td>
+<td>USB 控制器 → 局部互连 → 系统 NoC</td>
+<td>控制器读描述符、读/写传输数据或写事件</td>
+</tr>
+<tr class="even">
+<td>USB DMA</td>
+<td>系统 NoC → SRAM/DDR 对应分支</td>
+<td>同时选择正确地址区和真实 USB 事务</td>
+</tr>
+</tbody>
+</table>
+<p><code>rdata/wdata</code> 应从被测总线主设备的视角解释，不等同于 USB
+的 IN/OUT。CPU 执行一次 <code>readl()</code> 也不能替代 USB DMA
+主设备的读事务。</p>
+<h2 id="用例表必须表达的信息">用例表必须表达的信息</h2>
+<p>每条用例至少记录：路径、读写方向、注错源、检测端、注错/使能/mask/状态/清除寄存器及位域、写保护要求、中断域与编号、缓冲区位置、触发操作和额外初始化。明确位图与位序号的区别，避免重复移位。</p>
+<p>使用稳定的路径标识关联需求与结果，不依赖易变的数组序号。中断号应注明是硬件
+INTID、SPI
+相对编号还是软件映射编号；不要不加区分地使用“编号加固定偏移”。</p>
+<h2 id="标准测试闭环">标准测试闭环</h2>
+<ol type="1">
+<li><strong>建立基线</strong>：停止注错，清理旧状态，登记
+ISR，确认无异常中断。</li>
+<li><strong>准备事务</strong>：完成当前用例所需的控制器、缓冲区和对端初始化。</li>
+<li><strong>配置注错</strong>：按写保护流程设置检测使能和目标注错位，检查必要的读回。</li>
+<li><strong>触发访问</strong>：执行确实经过目标通路的 MMIO 或 USB DMA
+事务。</li>
+<li><strong>检查上报</strong>：分别验证检测端状态、汇聚状态和目标
+ISR，排除其他错误源。</li>
+<li><strong>检查屏蔽</strong>：仅屏蔽目标上报路径，确认不再进入目标
+ISR；原始状态是否保持应按手册区分于屏蔽后状态。</li>
+<li><strong>检查解屏蔽</strong>：按中断类型，验证待处理状态重新上报，或清状态后重新注错并触发；不假设所有边沿中断都会因解屏蔽自动重发。</li>
+<li><strong>检查清除</strong>：停止持续注错后按定义清状态，并完成必要的中断应答，防止立即重新置位。</li>
+<li><strong>检查
+disable</strong>：关闭被测安全机制，重复有效的注错与事务，确认不产生该机制预期禁止的状态/安全中断。</li>
+<li><strong>恢复环境</strong>：还原使能、mask、写保护及链路状态，检查下一条用例可独立启动。</li>
+</ol>
+<p>Mask 极性和多级汇聚关系必须显式配置。不要套用“写 1
+一定屏蔽”，也不要为调试把所有 mask 写全 1 后当作正式结论。Disable
+的负向验证要确认事务确实发生，不能以“业务未运行、所以无中断”判通过。</p>
+<h2 id="用例独立性与结论边界">用例独立性与结论边界</h2>
+<p>原记录中，部分用例只有在前一条已初始化控制器、切换缓冲区或修改 mask
+后才能通过。应同时执行冷启动单条、顺序全量和重复执行；若断开连接后仍无法重跑，说明还需要清理控制器、描述符或协同模型状态。</p>
+<p>原记录包含早期小集合顺序通过、扩充集合后仍有失败，以及后续重新梳理用例后的样片通过结果。<strong>这些结果不等于同一版
+Strato 全量仿真通过，也不能用样片通过替代仿真覆盖证明。</strong>
+自动生成的注错表仍需逐项校验通路和位域，失败项不得无依据删除或统计为通过。</p>
+<h1 id="波形触发与协议观测">波形、触发与协议观测</h1>
+<h2 id="触发采集">触发采集</h2>
+<p>以下命令来自原 Veloce
+环境；信号路径必须替换为当前编译数据库中存在且可触发的对象。</p>
+<figure class="highlight tcl"><table><tr><td class="code"><pre><span class="line"><span class="comment"># velrun：trig.tcl</span></span><br><span class="line">run -stop</span><br><span class="line">hwtrace on</span><br><span class="line">hwtrace setdepth <span class="number">320000</span></span><br><span class="line">trigger download condition.trigger -position <span class="number">20</span></span><br><span class="line">run</span><br><span class="line"><span class="comment"># 需要同步等待时再打开；等待期间控制台可能无法接受普通命令</span></span><br><span class="line"><span class="comment"># waitfor trigger</span></span><br></pre></td></tr></table></figure>
+<p><code>condition.trigger</code> 示例，表示先观察调试寄存器为
+0，再等待其变为 1：</p>
+<figure class="highlight text"><table><tr><td class="code"><pre><span class="line">state S0: initial</span><br><span class="line">  next(emu_top.DUT.usb_debug.trigger_reg == 32&#x27;h00000000);</span><br><span class="line">state S1: store</span><br><span class="line">  next(emu_top.DUT.usb_debug.trigger_reg == 32&#x27;h00000001);</span><br><span class="line">state Final :trigger ;</span><br></pre></td></tr></table></figure>
+<p>此层级是脱敏示意，不代表实际设计。软件可通过工程预留、且允许写入的调试
+CSR 先写 0 再写 1 产生标记；不要任意使用未定义的 reserved 位。</p>
+<p>原工程的触发器只接受支持的 Reg 对象，曾出现“信号可见但类型为
+Net、不能作为触发条件”的问题。应从当前数据库选择等价的可触发寄存器信号，不能仅修改信号名称，更不能直接改
+RTL
+类型绕过检查。地址匹配条件还需结合总线有效握手或注错信号，避免把无效周期地址当作真实事务。</p>
+<h2 id="深度位置与信号范围">深度、位置与信号范围</h2>
+<ul>
+<li>原版本允许的 trace 深度为
+<strong>32～320968</strong>，<code>320000</code>
+是接近上限的示例，不是跨版本固定值。</li>
+<li><code>-position 20</code> 表示约 20%
+深度用于触发前记录；具体行为以安装手册为准。</li>
+<li>按每周期一份样本估算，500 kHz 下 320000 个样本仅覆盖约 <strong>0.64
+秒仿真时间</strong>；2 秒需要约 1000000
+个样本，超过上述上限。实际时窗仍受采集配置影响。</li>
+<li>优先覆盖注错控制、总线地址/握手、检测状态、mask、IRQ
+和软件标记，避免直接递归抓取整个 SoC。</li>
+</ul>
+<p><code>sig.list</code> 使用原工具支持的信号列表语法，例如：</p>
+<figure class="highlight text"><table><tr><td class="code"><pre><span class="line">NET emu_top.DUT.usb_debug -r</span><br></pre></td></tr></table></figure>
+<p>按实际层级替换后上传：</p>
+<figure class="highlight tcl"><table><tr><td class="code"><pre><span class="line">upload -noreplay -tracedir usb_case_trace.stw -siglist sig.<span class="keyword">list</span></span><br></pre></td></tr></table></figure>
+<p><code>-noreplay</code> 表示此次上传不发起 replay
+处理。上传路径相对于当前工程的规则以日志为准；原环境通常输出至
+<code>veloce.wave/</code>。服务器 shell 中的
+<code>make wave_share</code> 是工程辅助目标，不是 <code>velrun</code>
+Tcl 命令。</p>
+<h2 id="手动连续采集">手动连续采集</h2>
+<figure class="highlight tcl"><table><tr><td class="code"><pre><span class="line"><span class="comment"># velrun：开始采集</span></span><br><span class="line">run -stop</span><br><span class="line">hwtrace on</span><br><span class="line">hwtrace autoupload on -noreplay -tracedir usb_manual.stw -siglist sig.<span class="keyword">list</span></span><br><span class="line">run</span><br><span class="line"></span><br><span class="line"><span class="comment"># 测试完成后停止采集</span></span><br><span class="line">run -stop</span><br><span class="line">hwtrace autoupload off</span><br><span class="line">hwtrace off</span><br></pre></td></tr></table></figure>
+<p>协议分析可通过原工程的 <code>vlab_pa</code>
+启动，前提是相关模型、许可证和工程配置可用。协议分析回答枚举和传输是否发生，RTL
+trace 回答内部注错与中断如何传播；两者不能相互替代。</p>
+<h1 id="linux-侧观测补充">Linux 侧观测补充</h1>
+<p>以下操作在<strong>真正运行 USB Host 驱动的 Linux
+系统</strong>执行；DUT 为 Device 时通常是 QEMU Guest，而不一定是承载
+<code>velrun</code> 的服务器。不要在错误的系统采集空日志后推断 DUT
+没有事务。</p>
+<h2 id="xhci-动态调试">xHCI 动态调试</h2>
+<p>内核需要具备对应 dynamic debug 调试点。以 root 操作，在 debugfs
+已挂载时可使用：[4]</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line"><span class="comment"># Linux Host；与 Strato Tcl 控制台无关</span></span><br><span class="line"><span class="built_in">printf</span> <span class="string">&#x27;%s\n&#x27;</span> <span class="string">&#x27;module xhci_hcd +p&#x27;</span> &gt; /sys/kernel/debug/dynamic_debug/control</span><br><span class="line">dmesg -w</span><br><span class="line"></span><br><span class="line"><span class="comment"># 调试结束后关闭本次启用的打印</span></span><br><span class="line"><span class="built_in">printf</span> <span class="string">&#x27;%s\n&#x27;</span> <span class="string">&#x27;module xhci_hcd -p&#x27;</span> &gt; /sys/kernel/debug/dynamic_debug/control</span><br></pre></td></tr></table></figure>
+<p>部分内核也提供
+<code>/proc/dynamic_debug/control</code>。启用前检查目录和匹配的调试点；内建驱动或平台封装可能需要按实际模块名、文件名筛选。若原本已有调试配置，应恢复原状态，而不是覆盖其他人的设置。</p>
+<h2 id="usbmon">usbmon</h2>
+<p>在具备 <code>CONFIG_USB_MON</code> 支持的 Linux Host 上，按需挂载
+debugfs、加载 <code>usbmon</code> 并选择目标总线：[2]</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line"><span class="comment"># root；仅在 debugfs 尚未挂载时执行 mount</span></span><br><span class="line">mount -t debugfs none /sys/kernel/debug</span><br><span class="line"><span class="comment"># 仅在 usbmon 编译为模块时需要</span></span><br><span class="line">modprobe usbmon</span><br><span class="line">lsusb -t</span><br><span class="line"></span><br><span class="line"><span class="comment"># 将 BUS 替换为目标 USB 总线号；Ctrl+C 停止</span></span><br><span class="line"><span class="built_in">cat</span> /sys/kernel/debug/usb/usbmon/<span class="variable">$&#123;BUS&#125;</span>u &gt; usb-host.mon</span><br></pre></td></tr></table></figure>
+<p>这是便于人工检查的文本接口；内核文档已将文本 API
+标记为弃用，正式分析可选用支持二进制 usbmon 的工具。<code>0u</code>
+覆盖全部总线，通常不如限定总线适合最小复现。</p>
+<p>重点关联 URB 的提交 <code>S</code>、完成回调 <code>C</code>、提交错误
+<code>E</code>、端点、方向、状态及长度。<strong>usbmon 记录驱动与 HCD
+之间的请求，不是精确的物理 USB 链路分析仪</strong>；若 HCD
+有问题，其记录与真实总线事务可能不一致。[2]
+抓取还可能包含有效载荷，归档或对外共享前再次脱敏。</p>
+<h2 id="与-linux-驱动的对应关系">与 Linux 驱动的对应关系</h2>
+<p>裸驱确认 MMIO、IRQ 与 DMA 基础链路后，再迁移到
+Linux：核对固件描述中的寄存器、IRQ、时钟、复位、PHY 和
+<code>dr_mode</code>；通过内核 MMIO/DMA API 管理映射、缓存和所有权；按
+Host/Device 角色使用对应 USB 框架。不要在 Linux
+中另行复制裸驱的硬编码初始化去与既有驱动竞争硬件。</p>
+<p>仿真频率、trace 采集和日志可能显著增加墙上时间，但硬件超时、Guest
+定时器及协同模型也有各自时间语义。保持有界等待并记录仿真进度，不以无限重试掩盖未完成的事务。</p>
+<h1 id="常见故障定位">常见故障定位</h1>
+<table>
+<colgroup>
+<col style="width: 27%">
+<col style="width: 36%">
+<col style="width: 36%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>现象</th>
+<th>优先检查</th>
+<th>判断依据</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>未知信号、启动脚本报错</td>
+<td>当前标签、干净环境、<code>run.tcl</code> 层级和工具版本</td>
+<td>不先假定 USB 驱动故障</td>
+</tr>
+<tr class="even">
+<td>AVB 空闲但模型无法运行</td>
+<td>数量、列表顺序、Module 映射及资源约束</td>
+<td>对照同标签已验证组合，不盲目增减数量</td>
+</tr>
+<tr class="odd">
+<td>安全核无输出</td>
+<td>ROM 类型、RAM 分片、链接脚本、复位和时钟</td>
+<td>镜像“文件存在”不足以证明格式正确</td>
+</tr>
+<tr class="even">
+<td>安全核正常、应用核无输出</td>
+<td>DDR/SRAM 加载位置、释放命令、入口及 UART</td>
+<td>先证明入口可执行，再查 USB</td>
+</tr>
+<tr class="odd">
+<td>Synchronous Abort</td>
+<td>MMIO 访问宽度、地址、权限、电源/时钟</td>
+<td>检查异常现场与反汇编中的实际读写宽度</td>
+</tr>
+<tr class="even">
+<td><code>DCTL</code> 复位不结束、事件区写入卡住</td>
+<td>Host/Device 工程匹配，再查访问和链路</td>
+<td>原记录中切换匹配的 Device 工程解决过此类问题</td>
+</tr>
+<tr class="odd">
+<td>注错无状态</td>
+<td>实际事务是否发生、路径是否正确、检测使能</td>
+<td>检查 DMA 最终地址和握手，不只读回 inject 位</td>
+</tr>
+<tr class="even">
+<td>状态置位但无 ISR</td>
+<td>检测端、汇聚端、mask、中断域与 GIC 注册</td>
+<td>区分原始状态、屏蔽后状态和 CPU pending</td>
+</tr>
+<tr class="odd">
+<td>单条失败、全量通过</td>
+<td>隐式初始化、缓冲区、mask 和旧事件</td>
+<td>从干净状态独立执行并比较寄存器快照</td>
+</tr>
+<tr class="even">
+<td>首次正常、第二次卡住</td>
+<td>描述符所有权、控制器事件、对端和协同模型</td>
+<td>仅断开连接不保证完成全部清理</td>
+</tr>
+<tr class="odd">
+<td>trigger 不出现或报类型错误</td>
+<td>深度、对象类型、层级、触发下载和时钟</td>
+<td>先用最小软件标记确认基础链路</td>
+</tr>
+<tr class="even">
+<td>初始化耗时异常</td>
+<td>大范围清零、仿真进度与总线活动</td>
+<td>区分性能问题与真正停滞</td>
+</tr>
+</tbody>
+</table>
+<p>X11 认证失败时，检查转发会话、<code>xauth</code>
+和凭据归属，优先重新建立受支持的登录会话，不把删除认证文件作为通用修复。若报告已有协同模型占用，先在报错指向的主机核实
+PID、所有者及资源状态；仅在管理员确认会话已结束后处理残留锁，不能仅因本机查不到
+PID 就删除。</p>
+<h1 id="执行与归档清单">执行与归档清单</h1>
+<ul>
+<li><strong>启动前</strong>：确认硬件标签、AVB、用户
+shadow、工具版本、启动介质、镜像及 <code>run.tcl</code> 配套。</li>
+<li><strong>测试前</strong>：确认角色与对端、基础枚举、32 位访问器、DMA
+最终地址、用例通路、mask 极性及 ISR。</li>
+<li><strong>注错时</strong>：保留事务证据、原始/汇聚状态、中断计数，以及屏蔽、清除、disable
+的负向验证。</li>
+<li><strong>回归时</strong>：分别记录冷启动单条、顺序全量和重复执行；失败、未执行、不适用分开统计。</li>
+<li><strong>归档时</strong>：保存配置、镜像校验值、用例表版本、命令、串口/Host
+日志、trace 和已知限制，并再次检查标识与有效载荷脱敏。</li>
+</ul>
+<h1 id="参考资料">参考资料</h1>
+<ol type="1">
+<li><a href="https://www.siemens.com/en-us/products/ic/hav/veloce-cs/strato-cs/">Siemens：Veloce
+Strato CS Emulation
+Platform</a>——平台定位；不作为旧版工程命令与资源限制的依据。</li>
+<li><a href="https://docs.kernel.org/usb/usbmon.html">Linux
+Kernel：usbmon</a>——采集方法、事件格式及 HCD 观测边界。</li>
+<li><a href="https://docs.kernel.org/core-api/dma-api-howto.html">Linux
+Kernel：Dynamic DMA mapping
+Guide</a>——地址空间、映射、一致性及内存屏障。</li>
+<li><a href="https://docs.kernel.org/admin-guide/dynamic-debug-howto.html">Linux
+Kernel：Dynamic debug</a>——启停调试点、筛选方式和配置条件。</li>
+</ol>
+<p>Veloce 私有命令以安装版本随附的用户手册、命令参考和虚拟 USB
+模型手册为准；SoC
+配置以当前交付的寄存器表、地址通路表及已验证启动脚本为准。以上公开页面经浏览器访问核对，未向在线服务提交原始文档或内部参数。</p>
 ]]></content>
       <tags>
         <tag>Linux</tag>
